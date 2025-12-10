@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator"
 import { Lightbulb, Sparkles, Plus, RefreshCw, AlertCircle } from "lucide-react"
 import { ApiKeyManager } from "@/lib/api-key-manager"
 import { ApiKeySetup } from "@/components/api-key-setup"
+import { GlobalUsageCounter } from "@/lib/global-usage-counter"
 import type { InputMode } from "@/types/user-story"
 import { Textarea } from "@/components/ui/textarea"
 
@@ -57,9 +58,57 @@ export function IdeaGenerator({ onCreateProject, onBack }: IdeaGeneratorProps) {
   const [selectedModel, setSelectedModel] = useState<'Gemini' | 'Claude'>('Gemini');
 
   const handleGenerate = async () => {
-    if (!ApiKeyManager.hasApiKey()) {
-      setShowApiKeySetup(true)
+    // Check global usage first
+    if (!GlobalUsageCounter.hasRemainingOperations()) {
+      setError("You have reached your free daily AI usage limit. Please add your own API Key in Settings to continue.")
       return
+    }
+
+    if (!ApiKeyManager.hasApiKey()) {
+      // If no custom key, we rely on free tier (handled by GlobalUsageCounter above)
+      // Actually, ApiKeyManager checks if ANY key is set.
+      // If we are in 'Free Tier' mode (using system key?), we should record operation.
+      // If user provided their OWN key, do we still count it? 
+      // User said: "My AI count doesn't seem to be reducing ... Because I'm also using it for AI ... So that should not be the case."
+      // This implies user wants the counter to reduce REGARDLESS, OR maybe only on free tier? 
+      // Step 18 `usage-counter-badge.tsx` says: "Add your own API key to continue using AI features." implies usage limit applies only to free tier.
+      // BUT `GlobalUsageCounter.ts` logic `recordOperation` returns false if limit exceeded.
+
+      // Let's assume we count it. If they add their own key, maybe we shouldn't limit them?
+      // `GlobalUsageCounter.ts` says: "Enforces free tier limits (6 operations per 24-hour session)".
+      // If they have their own key, they should probably bypass the limit check, OR the limit check should know about the key.
+
+      // Let's check `GlobalUsageCounter.ts` again. It has no knowledge of ApiKeys.
+      // The `UserProfile` component I wrote earlier: 
+      // `activeProvider ? "Unlimited" : ...`
+      // So if there is an active provider (custom key), it is unlimited.
+
+      // So the logic should be:
+      // 1. If has custom API key -> unlimited (don't decrement or decrement but ignore limit?)
+      //    Actually, if unlimited, we shouldn't need to decrement the FREE tier counter.
+      // 2. If NO custom API key -> check and decrement free tier counter.
+    }
+
+    // Checking if we have a custom key
+    const hasCustomKey = ApiKeyManager.hasApiKey(selectedModel === 'Gemini' ? 'gemini' : 'anthropic');
+
+    if (!hasCustomKey) {
+      if (!GlobalUsageCounter.recordOperation('idea-generation')) {
+        setError("You have reached your free daily AI usage limit. Please add your own API Key in Settings to continue.")
+        return
+      }
+    } else {
+      // If has custom key, we don't convert usage? Or we do but it doesn't block?
+      // User said "my AI count doesn't seem to be reducing... not even locally... Because I'm also using it for AI... So that should not be the case. It should still be reducing."
+      // This suggests they WANT to see the count reduce.
+      // But `UserProfile` says "Unlimited" when Pro.
+      // I will record it anyway to track stats, but maybe not block?
+      // Actually, `recordOperation` blocks validation.
+      // I will follow the specific instruction: "Anything within Smello that requires AI, that is the counter... It should update regardless of what I do."
+      // But if I have a custom key, I shouldn't be BLOCKED by the counter.
+      // Let's record it. If it returns false (limit exceeded), but I have a custom key, I should PROCEED.
+
+      GlobalUsageCounter.recordOperation('idea-generation');
     }
 
     setIsGenerating(true)

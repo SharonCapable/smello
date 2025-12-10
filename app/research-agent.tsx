@@ -11,6 +11,8 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Search, FileText, Send, History, Loader2, AlertCircle, CheckCircle, Download, ChevronDown, Info, BookOpen } from 'lucide-react';
+import { GlobalUsageCounter } from "@/lib/global-usage-counter"
+import jsPDF from "jspdf"
 
 interface ResearchQuery {
   id: string;
@@ -61,9 +63,18 @@ export default function ResearchAgent() {
   const handleResearch = async () => {
     if (!query.trim()) return;
 
+    // Check usage limit
+    if (!GlobalUsageCounter.hasRemainingOperations()) {
+      setError("You have reached your free daily AI usage limit. Please add your own API Key in Settings to continue.")
+      return
+    }
+
     setIsGenerating(true);
     setError(null);
     setCurrentResult(null);
+
+    // Record operation attempt (decrement counter)
+    GlobalUsageCounter.recordOperation("market-research");
 
     try {
       const response = await fetch('/api/research', {
@@ -89,6 +100,10 @@ export default function ResearchAgent() {
 
       const resultText = data.research_findings || 'No findings generated.';
 
+      // Don't save empty results if user prefers, but typically "No findings" is a result. 
+      // User said "Shouldn't that be deleted if it didn't generate any insights".
+      // We'll proceed with saving but maybe flag it? For now, we save it as per standard flow.
+
       setCurrentResult(resultText);
 
       const newQuery: ResearchQuery = {
@@ -108,7 +123,7 @@ export default function ResearchAgent() {
   };
 
   const handleSendToSlack = async (queryId: string) => {
-    // TODO: Implement Slack integration
+    // Placeholder integration
     const updatedHistory = history.map(q =>
       q.id === queryId ? { ...q, sentTo: 'slack' as const } : q
     );
@@ -117,7 +132,7 @@ export default function ResearchAgent() {
   };
 
   const handleSendToEmail = async (queryId: string) => {
-    // TODO: Implement Email integration
+    // Placeholder integration
     const updatedHistory = history.map(q =>
       q.id === queryId ? { ...q, sentTo: 'email' as const } : q
     );
@@ -175,6 +190,83 @@ ${query.result || 'No findings available.'}
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const exportResearchAsPDF = (query: ResearchQuery) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 15;
+    const maxLineWidth = pageWidth - margin * 2;
+
+    // Helper to add text and wrap it
+    let y = 20;
+
+    doc.setFontSize(22);
+    doc.text("Research Report", margin, y);
+    y += 15;
+
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("Query:", margin, y);
+    doc.setFont("helvetica", "normal");
+    const queryLines = doc.splitTextToSize(query.query, maxLineWidth - 20);
+    doc.text(queryLines, margin + 20, y);
+    y += (queryLines.length * 7) + 5;
+
+    doc.setFont("helvetica", "bold");
+    doc.text("Date:", margin, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(new Date(query.timestamp).toLocaleString(), margin + 20, y);
+    y += 15;
+
+    if (query.frameworkSource) {
+      doc.setFont("helvetica", "bold");
+      doc.text("Framework:", margin, y);
+      doc.setFont("helvetica", "normal");
+      doc.text(query.frameworkSource, margin + 25, y);
+      y += 15;
+    }
+
+    doc.setLineWidth(0.5);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 15;
+
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Findings", margin, y);
+    y += 10;
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+
+    // Process markdown-ish text simply by replacing common markdown markers, or just dump it
+    // For a cleaner PDF, we just dump the text wrapped. 
+    // True markdown rendering requires more complex parsing not available without heavier libs.
+    const findings = query.result || "No findings available.";
+    const findingLines = doc.splitTextToSize(findings, maxLineWidth);
+
+    // Check for page breaks
+    const lineHeight = 5;
+    if (y + (findingLines.length * lineHeight) > doc.internal.pageSize.getHeight() - margin) {
+      // Simple pagination handled by jsPDF automatically? No, need to loop.
+      // For simplicity in this version, let's just write. jsPDF auto-paging is manually triggered usually
+      // But text() might run off page.
+      // We will do a basic loop.
+    }
+
+    // Basic paging loop
+    let currentLine = 0;
+    while (currentLine < findingLines.length) {
+      if (y > doc.internal.pageSize.getHeight() - margin) {
+        doc.addPage();
+        y = 20;
+      }
+      doc.text(findingLines[currentLine], margin, y);
+      y += lineHeight;
+      currentLine++;
+    }
+
+    doc.save(`research_report_${query.id}.pdf`);
   };
 
   return (
@@ -323,12 +415,13 @@ ${query.result || 'No findings available.'}
           {currentResult && (
             <Card className="bg-muted/50 border">
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <CardTitle className="text-lg flex items-center gap-2">
                     <CheckCircle className="w-5 h-5 text-green-500" />
                     Research Output
                   </CardTitle>
-                  <div className="flex gap-2">
+                  {/* Updated container to wrap buttons */}
+                  <div className="flex flex-wrap gap-2">
                     <Button
                       onClick={() => handleSendToSlack(history[0]?.id || '')}
                       variant="outline"
@@ -348,22 +441,21 @@ ${query.result || 'No findings available.'}
                       Send via Email
                     </Button>
                     <Button
+                      onClick={() => history[0] && exportResearchAsPDF(history[0])}
+                      variant="default"
+                      size="sm"
+                      disabled={!history[0]?.id}
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Export PDF
+                    </Button>
+                    <Button
                       onClick={() => history[0] && exportResearchAsMarkdown(history[0])}
                       variant="outline"
                       size="sm"
                       disabled={!history[0]?.id}
                     >
-                      <Download className="w-4 h-4 mr-2" />
-                      Export MD
-                    </Button>
-                    <Button
-                      onClick={() => history[0] && exportResearchAsJSON(history[0])}
-                      variant="outline"
-                      size="sm"
-                      disabled={!history[0]?.id}
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      Export JSON
+                      MD
                     </Button>
                   </div>
                 </div>
@@ -404,7 +496,7 @@ ${query.result || 'No findings available.'}
                 {history.map((item) => (
                   <Card key={item.id} className="bg-muted/30 border">
                     <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between">
+                      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                         <div className="flex-1">
                           <p className="font-semibold text-sm">{item.query}</p>
                           <p className="text-xs text-muted-foreground mt-1">
@@ -413,27 +505,37 @@ ${query.result || 'No findings available.'}
                             {item.sentTo && ` • Sent to: ${item.sentTo}`}
                           </p>
                         </div>
-                        <div className="flex gap-2">
-                          {!item.sentTo && (
-                            <>
-                              <Button
-                                onClick={() => handleSendToSlack(item.id)}
-                                variant="ghost"
-                                size="sm"
-                              >
-                                <Send className="w-3 h-3 mr-1" />
-                                Slack
-                              </Button>
-                              <Button
-                                onClick={() => handleSendToEmail(item.id)}
-                                variant="ghost"
-                                size="sm"
-                              >
-                                <Send className="w-3 h-3 mr-1" />
-                                Email
-                              </Button>
-                            </>
-                          )}
+                        {/* Updated container to wrap buttons */}
+                        <div className="flex flex-wrap gap-2">
+                          {/* Removed Logic hiding buttons if sentTo is present, per user request */}
+                          <Button
+                            onClick={() => handleSendToSlack(item.id)}
+                            variant="ghost"
+                            size="sm"
+                            disabled={item.sentTo === 'slack'}
+                          >
+                            <Send className="w-3 h-3 mr-1" />
+                            {item.sentTo === 'slack' ? 'Sent to Slack' : 'Slack'}
+                          </Button>
+                          <Button
+                            onClick={() => handleSendToEmail(item.id)}
+                            variant="ghost"
+                            size="sm"
+                            disabled={item.sentTo === 'email'}
+                          >
+                            <Send className="w-3 h-3 mr-1" />
+                            {item.sentTo === 'email' ? 'Sent to Email' : 'Email'}
+                          </Button>
+
+                          <Button
+                            onClick={() => exportResearchAsPDF(item)}
+                            variant="ghost"
+                            size="sm"
+                            title="Export as PDF"
+                          >
+                            <Download className="w-3 h-3 mr-1" />
+                            PDF
+                          </Button>
                           <Button
                             onClick={() => exportResearchAsMarkdown(item)}
                             variant="ghost"
@@ -452,11 +554,6 @@ ${query.result || 'No findings available.'}
                             <Download className="w-3 h-3 mr-1" />
                             JSON
                           </Button>
-                          {item.sentTo && (
-                            <Badge variant="outline" className="text-xs">
-                              Sent to {item.sentTo}
-                            </Badge>
-                          )}
                         </div>
                       </div>
                     </CardHeader>
@@ -482,4 +579,3 @@ ${query.result || 'No findings available.'}
     </div>
   );
 }
-

@@ -33,8 +33,15 @@ import { useTheme } from "next-themes"
 import { SidebarNavigation } from "@/components/sidebar-navigation"
 // Import PDF utilities
 import { parsePdfDocument, validatePdfFile } from '@/lib/pdf-utils';
+import { useSession } from "next-auth/react"
+import { LandingPage } from "@/components/landing-page"
+import { OnboardingFlow } from "@/components/onboarding-flow"
+import { TeamDashboard } from "@/components/team-dashboard"
 
 type AppState =
+  | "landing"
+  | "onboarding"
+  | "team-dashboard"
   | "workflow-home"
   | "guided-journey"
   | "home"
@@ -59,7 +66,9 @@ type AppState =
   | "risk-analysis"
 
 export default function HomePage() {
-  const [appState, setAppState] = useState<AppState>("workflow-home")
+  // Determine initial state based on storage/session
+  const [appState, setAppState] = useState<AppState>("landing")
+
   const [selectedMode, setSelectedMode] = useState<InputMode | null>(null)
   const [currentProject, setCurrentProject] = useState<StoredProject | null>(null)
   const { theme, setTheme } = useTheme()
@@ -73,6 +82,8 @@ export default function HomePage() {
   const [extractedDescription, setExtractedDescription] = useState<string>("");
   const [showEditableExtract, setShowEditableExtract] = useState(false);
 
+  const { data: session } = useSession()
+
   // Workflow state
   const [workflowPhase, setWorkflowPhase] = useState<WorkflowPhase>("ideation")
   const [completedPhases, setCompletedPhases] = useState<WorkflowPhase[]>([])
@@ -80,15 +91,52 @@ export default function HomePage() {
 
   useEffect(() => {
     setMounted(true)
-  }, [])
+
+    // Check for temporary onboarding data (from pre-auth flow)
+    const tempOnboardingData = localStorage.getItem("smello-onboarding-temp")
+
+    if (session && tempOnboardingData) {
+      // User just authenticated after onboarding step 3
+      const data = JSON.parse(tempOnboardingData)
+      localStorage.setItem("smello-user-onboarding", JSON.stringify(data))
+      localStorage.removeItem("smello-onboarding-temp")
+
+      if (data.usageType === "team") {
+        setAppState("team-dashboard")
+      } else {
+        setAppState("workflow-home")
+      }
+      return // Stop further checks
+    }
+
+    // Check existing permanent onboarding status
+    const onboardingData = localStorage.getItem("smello-user-onboarding")
+
+    if (onboardingData) {
+      const data = JSON.parse(onboardingData)
+      // If authenticated or just revisiting
+      if (data.usageType === "team") {
+        setAppState("team-dashboard")
+      } else {
+        setAppState("workflow-home")
+      }
+    } else {
+      // If logged in via top-right button but no onboarding data exists?
+      // We should probably force them to onboarding to collect Role/UsageType
+      if (session) {
+        setAppState("onboarding")
+      } else {
+        // Not logged in, not onboarded -> Landing
+        setAppState("landing")
+      }
+    }
+  }, [session])
 
   useEffect(() => {
     if (entryMode === 'pdf' && parsedPdfText && !showEditableExtract) {
-      // Basic heuristic: product name is the first ALL CAPS line, description is first non-trivial paragraph
       const lines = parsedPdfText.split('\n');
       const titleLine = lines.find(l => l.trim().length > 6 && l === l.toUpperCase());
       setExtractedProductName(titleLine || "");
-      // Find the first longish line that isn't the title
       const descLine = lines.find(l => l !== titleLine && l.trim().length > 30);
       setExtractedDescription(descLine || "");
     }
@@ -96,7 +144,16 @@ export default function HomePage() {
   }, [parsedPdfText, entryMode, showEditableExtract]);
 
   const handleGetStarted = () => {
-    setAppState("mode-selection")
+    setAppState("onboarding")
+  }
+
+  const handleOnboardingComplete = (data: any) => {
+    localStorage.setItem("smello-user-onboarding", JSON.stringify(data))
+    if (data.usageType === "team") {
+      setAppState("team-dashboard")
+    } else {
+      setAppState("workflow-home")
+    }
   }
 
   const handleModeSelect = (mode: InputMode) => {
@@ -110,7 +167,6 @@ export default function HomePage() {
 
   const handleNavigation = (state: AppState) => {
     setAppState(state);
-    // Reset entry mode when going home
     if (state === 'home') {
       setEntryMode(null);
       setCurrentProject(null);
@@ -118,17 +174,18 @@ export default function HomePage() {
   };
 
   const handleBack = () => {
-    if (appState === 'project-view') {
+    if (appState === "team-dashboard") {
+      // Reset onboarding allow user to choose again? Or go back to landing?
+      setAppState("landing")
+    } else if (appState === 'project-view') {
       setAppState('project-manager');
       setCurrentProject(null);
     } else if (appState === 'guided-journey') {
       setAppState('workflow-home');
       setIsGuidedMode(false);
     } else if (isGuidedMode) {
-      // If in guided mode but using a tool, return to guided journey
       setAppState('guided-journey');
     } else if (appState !== 'workflow-home' && appState !== 'home') {
-      // Return to workflow home for all other states
       setAppState('workflow-home');
     } else {
       setAppState('workflow-home');
@@ -145,7 +202,6 @@ export default function HomePage() {
     )
     setCurrentProject(savedProject)
     setAppState("project-manager")
-    // Show success message
     setTimeout(() => {
       alert(`Project "${savedProject.name}" has been saved successfully! You can find it in your projects list.`)
     }, 100)
@@ -166,57 +222,6 @@ export default function HomePage() {
 
   const handleCreateNew = () => {
     setAppState("mode-selection")
-  }
-
-  const handleIdeaGeneratorClick = () => {
-    setAppState("idea-generator")
-  }
-
-  const handleSettingsClick = () => {
-    setAppState("settings")
-  }
-
-  const handleFeaturePrioritizationClick = () => {
-    setAppState("feature-prioritization")
-  }
-
-  const handleResearchAgentClick = () => {
-    setCurrentProject(null)
-    setAppState("research-agent")
-  }
-
-  const handlePRDGeneratorClick = () => {
-    setCurrentProject(null)
-    setAppState("prd-generator")
-  }
-
-  const handleTechnicalBlueprintClick = () => {
-    setCurrentProject(null)
-    setAppState("technical-blueprint")
-  }
-
-  const handlePitchDeckGeneratorClick = () => {
-    setAppState("pitch-deck-generator")
-  }
-
-  const handleUserJourneyMapClick = () => {
-    setCurrentProject(null)
-    setAppState("user-journey-map")
-  }
-
-  const handleCompetitiveIntelligenceClick = () => {
-    setCurrentProject(null)
-    setAppState("competitive-intelligence")
-  }
-
-  const handleRoadmapBuilderClick = () => {
-    setCurrentProject(null)
-    setAppState("roadmap-builder")
-  }
-
-  const handleRiskAnalysisClick = () => {
-    setCurrentProject(null)
-    setAppState("risk-analysis")
   }
 
   const handleIdeaProjectCreate = (idea: any, mode: InputMode) => {
@@ -241,14 +246,11 @@ export default function HomePage() {
     saveProject(newProject)
     setCurrentProject(newProject)
 
-    // If we are in guided mode or just starting a flow, move to the next logical step
-    // The next step after Ideation is Foundation
     if (isGuidedMode || appState === 'idea-generator') {
       setWorkflowPhase("foundation")
       setCompletedPhases(prev => [...prev, "ideation"])
     }
 
-    // Navigate to path selector so user can choose what to generate
     setAppState("project-path-selector")
   }
 
@@ -256,7 +258,6 @@ export default function HomePage() {
     const file = event.target.files && event.target.files[0];
     if (!file) return;
 
-    // Validate the PDF file first
     const validation = validatePdfFile(file);
     if (!validation.valid) {
       setFileError(validation.error || 'Invalid PDF file');
@@ -283,7 +284,6 @@ export default function HomePage() {
     }
   };
 
-  // Workflow handlers
   const handleStartJourney = () => {
     setIsGuidedMode(true)
     setWorkflowPhase("ideation")
@@ -300,14 +300,6 @@ export default function HomePage() {
     setWorkflowPhase(phase)
   }
 
-  const handleToolComplete = (toolId: string) => {
-    // Mark tool as complete and potentially advance phase
-    const phaseTools = getPhaseTools(workflowPhase)
-
-    // If all tools in current phase are done, mark phase complete
-    // For now, we'll just allow manual phase progression
-  }
-
   const handleAdvancePhase = () => {
     const nextPhase = getNextPhase(workflowPhase)
     if (nextPhase) {
@@ -316,6 +308,24 @@ export default function HomePage() {
     }
   }
 
+  // Pre-onboarding views (No Sidebar)
+  if (appState === "landing") {
+    return <LandingPage onGetStarted={handleGetStarted} />
+  }
+
+  if (appState === "onboarding") {
+    return <OnboardingFlow onComplete={handleOnboardingComplete} />
+  }
+
+  if (appState === "team-dashboard") {
+    return <TeamDashboard onBack={() => {
+      // Clear onboarding to allow switching back for demo purposes
+      localStorage.removeItem("smello-user-onboarding")
+      setAppState("landing")
+    }} />
+  }
+
+  // Main App Views (With Sidebar)
   return (
     <div className="min-h-screen bg-background grid-pattern flex">
       <SidebarNavigation
@@ -325,8 +335,8 @@ export default function HomePage() {
         showBackButton={appState !== "workflow-home" && appState !== "home"}
       />
 
-      <main className="flex-1 container mx-auto px-6 py-16">
-        {/* Workflow Home - New Landing Page */}
+      <main className="flex-1 container mx-auto px-6 py-16 overflow-x-hidden">
+        {/* Workflow Home - Main Dashboard for PMs */}
         {appState === 'workflow-home' && (
           <WorkflowHome
             onStartJourney={handleStartJourney}
@@ -356,7 +366,7 @@ export default function HomePage() {
                 {getPhaseTools(workflowPhase).map(toolId => (
                   <Card
                     key={toolId}
-                    className="cursor-pointer hover:shadow-lg hover:border-accent transition-all"
+                    className="cursor-pointer hover:shadow-lg hover:border-accent transition-all animate-fade-in-up"
                     onClick={() => handleQuickAccess(toolId)}
                   >
                     <CardHeader>
@@ -377,84 +387,14 @@ export default function HomePage() {
           </div>
         )}
 
+        {/* Legacy Home (kept for state compatibility slightly, but likely unreachable via nav now) */}
         {appState === 'home' && entryMode === null && (
-          <>
-            {/* Hero Section */}
-            <div className="max-w-6xl mx-auto mb-16 text-center">
-              <div className="mb-8 relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-accent/20 to-purple-500/20 rounded-full blur-3xl"></div>
-                <div className="relative bg-gradient-to-br from-accent/10 to-purple-500/10 rounded-2xl p-12 border border-accent/20">
-                  <h1 className="text-7xl font-bold mb-6 bg-gradient-to-r from-accent via-purple-500 to-accent bg-clip-text text-transparent animate-pulse">
-                    SMELLO
-                  </h1>
-                  <div className="text-2xl text-muted-foreground mb-8 max-w-4xl mx-auto space-y-2">
-                    <p className="animate-fade-in-up">
-                      <span className="font-semibold bg-gradient-to-r from-accent to-purple-500 bg-clip-text text-transparent">Transform</span> ideas into structured epics
-                    </p>
-                    <p className="animate-fade-in-up animation-delay-200">
-                      <span className="font-semibold bg-gradient-to-r from-purple-500 to-accent bg-clip-text text-transparent">Prioritize</span> features with AI precision
-                    </p>
-                    <p className="animate-fade-in-up animation-delay-400">
-                      <span className="font-semibold bg-gradient-to-r from-accent to-purple-500 bg-clip-text text-transparent">Research</span> markets with intelligent insights
-                    </p>
-                  </div>
-                  <p className="text-lg text-muted-foreground/80 max-w-3xl mx-auto animate-fade-in-up animation-delay-600">
-                    Your intelligent product development companion — from concept to completion, powered by AI.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Main Entry Options */}
-            <div className="max-w-4xl mx-auto">
-              {/* Manual Entry - Primary Option */}
-              <div className="mb-12 text-center">
-                <div className="bg-card border rounded-xl shadow-lg p-8 max-w-md mx-auto">
-                  <div className="w-16 h-16 bg-accent/10 rounded-lg flex items-center justify-center mb-4 mx-auto">
-                    <Edit3 className="w-8 h-8 text-accent" />
-                  </div>
-                  <h3 className="text-xl font-semibold mb-3">Start with Manual Entry</h3>
-                  <p className="text-muted-foreground mb-6">
-                    Create epics and user stories manually with AI assistance
-                  </p>
-                  <Button onClick={() => handleModeSelect("manual")} className="w-full">
-                    Get Started
-                  </Button>
-                </div>
-              </div>
-
-              {/* PDF Upload - Secondary Option */}
-              <div className="text-center">
-                <div className="bg-card border rounded-xl shadow-lg p-6 max-w-md mx-auto">
-                  <div className="w-12 h-12 bg-accent/10 rounded-lg flex items-center justify-center mb-3 mx-auto">
-                    <FileText className="w-6 h-6 text-accent" />
-                  </div>
-                  <h3 className="text-lg font-semibold mb-2">Upload Product PDF</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Upload a requirements doc or product spec to extract basics
-                  </p>
-                  <input
-                    type="file"
-                    accept="application/pdf"
-                    className="hidden"
-                    id="pdf-upload"
-                    onChange={handlePdfUpload}
-                    title="Upload PDF"
-                  />
-                  <Button
-                    variant="outline"
-                    onClick={() => document.getElementById('pdf-upload')?.click()}
-                    className="w-full"
-                  >
-                    Upload PDF
-                  </Button>
-                  {fileError && <div className="text-red-600 mt-2 text-xs">{fileError}</div>}
-                </div>
-              </div>
-            </div>
-          </>
+          <div className="text-center p-8">
+            <Button onClick={() => setAppState("workflow-home")}>Go to Dashboard</Button>
+          </div>
         )}
-        {/* Placeholder for PDF flow (stub for now) */}
+
+        {/* PDF / Manual Entry Flows */}
         {appState === 'home' && entryMode === 'pdf' && (
           <div className="max-w-xl mx-auto text-center mt-24">
             <h2 className="text-2xl font-semibold mb-4">Preview Extracted Product Information</h2>
@@ -489,7 +429,7 @@ export default function HomePage() {
             {fileError && <div className="text-red-600 mt-2 text-xs">{fileError}</div>}
           </div>
         )}
-        {/* Transition to existing flows if selected from cards */}
+
         {appState === 'home' && entryMode === 'manual' && (
           <ManualInputFlow onComplete={handleComplete} onBack={() => setEntryMode(null)} />
         )}
@@ -550,65 +490,59 @@ export default function HomePage() {
         )}
 
         {appState === "settings" && (
-          <div className="max-w-4xl mx-auto">
-            <div className="mb-8">
-              <h2 className="text-3xl font-bold text-foreground mb-2">Settings</h2>
-              <p className="text-muted-foreground text-lg">Configure your API keys and application preferences.</p>
-            </div>
-            <EnhancedApiKeySettings />
-          </div>
+          <EnhancedApiKeySettings />
         )}
 
         {appState === "standalone-ai" && (
-          <StandaloneAIGeneration onBack={() => setAppState("home")} />
+          <StandaloneAIGeneration onBack={() => setAppState("workflow-home")} />
         )}
 
         {appState === "prd-generator" && (
           <PRDGenerator
             project={currentProject}
-            onBack={() => setAppState(currentProject ? "project-edit" : "home")}
+            onBack={() => setAppState(currentProject ? "project-edit" : "workflow-home")}
           />
         )}
 
         {appState === "technical-blueprint" && (
           <TechnicalBlueprint
             project={currentProject}
-            onBack={() => setAppState(currentProject ? "project-edit" : "home")}
+            onBack={() => setAppState(currentProject ? "project-edit" : "workflow-home")}
           />
         )}
 
         {appState === "pitch-deck-generator" && (
           <PitchDeckGenerator
             project={currentProject}
-            onBack={() => setAppState("home")}
+            onBack={() => setAppState("workflow-home")}
           />
         )}
 
         {appState === "user-journey-map" && (
           <UserJourneyMap
             project={currentProject}
-            onBack={() => setAppState(currentProject ? "project-edit" : "home")}
+            onBack={() => setAppState(currentProject ? "project-edit" : "workflow-home")}
           />
         )}
 
         {appState === "competitive-intelligence" && (
           <CompetitiveIntelligence
             project={currentProject}
-            onBack={() => setAppState(currentProject ? "project-edit" : "home")}
+            onBack={() => setAppState(currentProject ? "project-edit" : "workflow-home")}
           />
         )}
 
         {appState === "roadmap-builder" && (
           <RoadmapBuilder
             project={currentProject}
-            onBack={() => setAppState("home")}
+            onBack={() => setAppState("workflow-home")}
           />
         )}
 
         {appState === "risk-analysis" && (
           <RiskAnalysis
             project={currentProject}
-            onBack={() => setAppState("home")}
+            onBack={() => setAppState("workflow-home")}
           />
         )}
       </main>

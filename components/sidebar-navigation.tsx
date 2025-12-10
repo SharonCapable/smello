@@ -4,6 +4,16 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+import {
   Home,
   ArrowLeft,
   Sparkles,
@@ -13,7 +23,6 @@ import {
   Settings,
   Sun,
   Moon,
-  Target,
   Menu,
   X,
   Monitor,
@@ -23,13 +32,18 @@ import {
   Map,
   Swords,
   Milestone,
-  AlertTriangle
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { UsageCounterBadge } from "@/components/usage-counter-badge"
 import { UserProfile } from "@/components/user-profile"
 
 type AppState =
+  | "landing"
+  | "onboarding"
+  | "team-dashboard"
   | "workflow-home"
   | "guided-journey"
   | "home"
@@ -59,19 +73,52 @@ interface SidebarNavigationProps {
   showBackButton?: boolean
 }
 
-export function SidebarNavigation({
+interface SidebarContentProps extends SidebarNavigationProps {
+  isCollapsed: boolean
+  toggleCollapse?: () => void
+  isMobile?: boolean
+  closeMobileSheet?: () => void
+}
+
+function SidebarContent({
   appState,
   onNavigate,
   onBack,
-  showBackButton = false
-}: SidebarNavigationProps) {
+  showBackButton,
+  isCollapsed,
+  toggleCollapse,
+  isMobile = false,
+  closeMobileSheet
+}: SidebarContentProps) {
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
-  const [isCollapsed, setIsCollapsed] = useState(false)
+  // State for collapsible groups - default open for better discovery
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+    "General": true,
+    "Ideation": true,
+    "Strategy": true,
+    "Build & Launch": true,
+    "System": true
+  })
 
   useState(() => {
     setMounted(true)
   })
+
+  const toggleGroup = (group: string) => {
+    setOpenGroups(prev => ({ ...prev, [group]: !prev[group] }))
+  }
+
+  const handleNavigation = (state: AppState) => {
+    onNavigate(state)
+    if (isMobile && closeMobileSheet) {
+      closeMobileSheet()
+    }
+  }
+
+  const handleDesktopVersion = () => {
+    window.open('/desktop', '_blank')
+  }
 
   const navigationItems = [
     {
@@ -109,52 +156,56 @@ export function SidebarNavigation({
     }
   ]
 
-  const handleDesktopVersion = () => {
-    window.open('/desktop', '_blank')
-  }
-
-  const handleNavigation = (state: AppState) => {
-    onNavigate(state)
-  }
-
   return (
-    <div className={`relative ${isCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 bg-card border-r border-border/50`}>
-      {/* Toggle Button */}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-3 top-6 z-10 h-6 w-6 rounded-full bg-background border border-border shadow-md p-0"
-      >
-        {isCollapsed ? <Menu className="w-3 h-3" /> : <X className="w-3 h-3" />}
-      </Button>
+    <div className={`flex flex-col h-full bg-card ${!isMobile ? 'border-r border-border/50' : ''}`}>
+      {/* Toggle Button (Desktop Only) */}
+      {!isMobile && toggleCollapse && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={toggleCollapse}
+          className="absolute -right-3 top-6 z-10 h-6 w-6 rounded-full bg-background border border-border shadow-md p-0"
+        >
+          {isCollapsed ? <Menu className="w-3 h-3" /> : <X className="w-3 h-3" />}
+        </Button>
+      )}
 
       {/* Logo Section */}
       <div className="p-4 border-b border-border/50">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center flex-shrink-0">
-            <Target className="w-4 h-4 text-accent-foreground" />
+          <div className="w-8 h-8 flex-shrink-0">
+            {/* Using the copied logo */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.png"
+              alt="SMELLO Logo"
+              className="w-full h-full object-contain rounded-md"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                e.currentTarget.parentElement?.classList.add('bg-accent');
+              }}
+            />
           </div>
-          {!isCollapsed && (
-            <h1 className="text-xl font-semibold text-foreground">SMELLO</h1>
+          {(!isCollapsed || isMobile) && (
+            <h1 className="text-xl font-bold text-foreground tracking-tight">SMELLO</h1>
           )}
         </div>
-        {!isCollapsed && (
+        {(!isCollapsed || isMobile) && (
           <Badge variant="secondary" className="text-xs mt-2">
-            v1.0
+            v1.0 Beta
           </Badge>
         )}
       </div>
 
       {/* Usage Counter */}
-      {!isCollapsed && (
+      {(!isCollapsed || isMobile) && (
         <div className="px-4 py-2 border-b border-border/50">
           <UsageCounterBadge />
         </div>
       )}
 
       {/* Back Button (when not on home) */}
-      {showBackButton && !isCollapsed && (
+      {showBackButton && (!isCollapsed || isMobile) && (
         <div className="p-4 border-b border-border/50">
           <Button
             variant="ghost"
@@ -169,72 +220,139 @@ export function SidebarNavigation({
       )}
 
       {/* Navigation Items */}
-      <div className="flex-1 py-4 overflow-y-auto">
-        <nav className="space-y-6 px-2">
-          {navigationItems.map((group, groupIndex) => (
-            <div key={groupIndex} className="space-y-1">
-              {!isCollapsed && (
-                <h3 className="px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                  {group.group}
-                </h3>
-              )}
-              {group.items.map((item) => {
-                const Icon = item.icon
-                const isActive = appState === item.id
+      <div className="flex-1 py-4 overflow-y-auto custom-scrollbar">
+        <nav className="space-y-4 px-2">
+          {navigationItems.map((group, groupIndex) => {
+            if (isCollapsed && !isMobile) {
+              // Collapsed View: Just icons
+              return (
+                <div key={groupIndex} className="space-y-1">
+                  {group.items.map((item) => {
+                    const Icon = item.icon
+                    const isActive = appState === item.id
+                    return (
+                      <Button
+                        key={item.id}
+                        variant={isActive ? "secondary" : "ghost"}
+                        className={`w-full justify-center px-2 ${isActive ? 'bg-accent text-accent-foreground' : ''}`}
+                        onClick={() => handleNavigation(item.id)}
+                        title={item.label}
+                      >
+                        <Icon className="w-5 h-5" />
+                      </Button>
+                    )
+                  })}
+                </div>
+              )
+            }
 
-                return (
-                  <Button
-                    key={item.id}
-                    variant={isActive ? "secondary" : "ghost"}
-                    className={`w-full justify-start ${isActive ? 'bg-accent text-accent-foreground' : ''} ${isCollapsed ? 'px-2' : 'px-4'}`}
-                    onClick={() => handleNavigation(item.id)}
-                    title={isCollapsed ? item.label : undefined}
-                  >
-                    <Icon className={`w-5 h-5 ${isCollapsed ? 'mx-auto' : 'mr-3'}`} />
-                    {!isCollapsed && <span>{item.label}</span>}
+            // Expanded / Mobile View: Collapsible Groups
+            return (
+              <Collapsible
+                key={groupIndex}
+                open={openGroups[group.group]}
+                onOpenChange={() => toggleGroup(group.group)}
+                className="space-y-1"
+              >
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" className="w-full justify-between px-4 h-8 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:bg-muted/50">
+                    {group.group}
+                    {openGroups[group.group] ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                   </Button>
-                )
-              })}
-            </div>
-          ))}
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-1 pt-1">
+                  {group.items.map((item) => {
+                    const Icon = item.icon
+                    const isActive = appState === item.id
+
+                    return (
+                      <Button
+                        key={item.id}
+                        variant={isActive ? "secondary" : "ghost"}
+                        className={`w-full justify-start pl-6 ${isActive ? 'bg-accent text-accent-foreground' : ''}`}
+                        onClick={() => handleNavigation(item.id)}
+                      >
+                        <Icon className="w-4 h-4 mr-3" />
+                        <span>{item.label}</span>
+                      </Button>
+                    )
+                  })}
+                </CollapsibleContent>
+              </Collapsible>
+            )
+          })}
         </nav>
       </div>
-      {/* Desktop Version - Separator */}
-      {!isCollapsed && <div className="border-t border-border/50 my-2" />}
 
-      {/* Desktop Version Button */}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={handleDesktopVersion}
-        className={`w-full justify-start ${isCollapsed ? 'px-2' : ''}`}
-        title={isCollapsed ? "Desktop Version" : undefined}
-      >
-        <Monitor className="w-4 h-4 flex-shrink-0" />
-        {!isCollapsed && <span className="ml-2">Desktop</span>}
-      </Button>
+      {/* Footer Actions */}
+      <div className="border-t border-border/50 p-2 space-y-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleDesktopVersion}
+          className={`w-full justify-start ${isCollapsed && !isMobile ? 'px-2 justify-center' : 'px-4'}`}
+          title={isCollapsed ? "Desktop Version" : undefined}
+        >
+          <Monitor className="w-4 h-4 flex-shrink-0" />
+          {(!isCollapsed || isMobile) && <span className="ml-2">Desktop</span>}
+        </Button>
 
-
-      {/* Theme Toggle */}
-      <div className="absolute bottom-4 left-4 right-4">
         <Button
           variant="outline"
           size="sm"
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          className={`w-full ${isCollapsed ? 'px-2' : ''}`}
+          className={`w-full justify-start ${isCollapsed && !isMobile ? 'px-2 justify-center' : 'px-4'}`}
           title={isCollapsed ? "Toggle theme" : undefined}
         >
+          {/* Theme Icon Logic */}
           {mounted ? (
-            theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />
+            theme === "dark" ? <Sun className="w-4 h-4 flex-shrink-0" /> : <Moon className="w-4 h-4 flex-shrink-0" />
           ) : (
-            <Sun className="w-4 h-4" />
+            <Sun className="w-4 h-4 flex-shrink-0" />
           )}
-          {!isCollapsed && <span className="ml-2">Theme</span>}
+          {(!isCollapsed || isMobile) && <span className="ml-2">Theme</span>}
         </Button>
       </div>
 
       {/* User Profile */}
-      {!isCollapsed && <UserProfile />}
-    </div >
+      {(!isCollapsed || isMobile) && <UserProfile />}
+    </div>
+  )
+}
+
+export function SidebarNavigation(props: SidebarNavigationProps) {
+  const [isCollapsed, setIsCollapsed] = useState(false)
+  const [isMobileOpen, setIsMobileOpen] = useState(false)
+
+  return (
+    <>
+      {/* Mobile Trigger */}
+      <div className="md:hidden fixed top-4 left-4 z-50">
+        <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
+          <SheetTrigger asChild>
+            <Button variant="outline" size="icon" className="bg-background shadow-md">
+              <Menu className="w-5 h-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="p-0 w-[280px]">
+            <SidebarContent
+              {...props}
+              isCollapsed={false}
+              isMobile={true}
+              closeMobileSheet={() => setIsMobileOpen(false)}
+            />
+          </SheetContent>
+        </Sheet>
+      </div>
+
+      {/* Desktop Sidebar */}
+      <div className={`hidden md:block relative ${isCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 h-screen sticky top-0`}>
+        <SidebarContent
+          {...props}
+          isCollapsed={isCollapsed}
+          toggleCollapse={() => setIsCollapsed(!isCollapsed)}
+        />
+      </div>
+    </>
   )
 }
