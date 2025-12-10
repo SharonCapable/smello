@@ -18,9 +18,10 @@ interface OnboardingData {
 interface OnboardingFlowProps {
     onComplete: (data: OnboardingData) => void
     isAuthenticated: boolean
+    onBack: () => void
 }
 
-export function OnboardingFlow({ onComplete, isAuthenticated }: OnboardingFlowProps) {
+export function OnboardingFlow({ onComplete, isAuthenticated, onBack }: OnboardingFlowProps) {
     const [step, setStep] = useState<1 | 2 | 3>(1)
     const [data, setData] = useState<OnboardingData>({
         name: "",
@@ -224,9 +225,17 @@ export function OnboardingFlow({ onComplete, isAuthenticated }: OnboardingFlowPr
                     )}
 
                     <div className="pt-4 flex justify-between items-center">
-                        {step > 1 && (
-                            <Button variant="ghost" className="text-muted-foreground" onClick={() => setStep(step - 1 as any)}>Back</Button>
-                        )}
+                        <Button
+                            variant="ghost"
+                            className="text-muted-foreground"
+                            onClick={() => {
+                                if (step === 1) onBack()
+                                else setStep(step - 1 as any)
+                            }}
+                        >
+                            Back
+                        </Button>
+
                         {step < 3 && (
                             <Button
                                 size="lg"

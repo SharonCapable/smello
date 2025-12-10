@@ -332,6 +332,7 @@ export default function HomePage() {
     return <OnboardingFlow
       onComplete={handleOnboardingComplete}
       isAuthenticated={!!session}
+      onBack={() => setAppState("landing")}
     />
   }
 

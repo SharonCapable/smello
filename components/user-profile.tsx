@@ -143,7 +143,7 @@ export function UserProfile() {
                         </div>
                     </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-64" alignOffset={-10} sideOffset={10}>
+                <DropdownMenuContent side="right" align="start" className="w-64" sideOffset={10}>
                     <DropdownMenuLabel>
                         <div className="flex flex-col space-y-1">
                             <p className="text-sm font-medium">{displayUserName}</p>
@@ -199,7 +199,10 @@ export function UserProfile() {
                         Settings & API Keys
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => signOut()} className="text-red-500 focus:text-red-500">
+                    <DropdownMenuItem onClick={() => {
+                        console.log("Signing out...");
+                        signOut({ callbackUrl: '/' });
+                    }} className="text-red-500 focus:text-red-500 cursor-pointer">
                         <LogOut className="w-4 h-4 mr-2" />
                         Sign Out
                     </DropdownMenuItem>
