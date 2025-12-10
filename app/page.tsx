@@ -129,11 +129,9 @@ export default function HomePage() {
           }
         }
       } else {
-        // Session exists but no onboarding data -> Force onboarding
-        // We allow 'onboarding' state to persist, but if they are on 'landing', move to onboarding
-        if (appState === "landing") {
-          setAppState("onboarding")
-        }
+        // Session exists but no onboarding data.
+        // We used to force onboarding here, but the user prefers to see the Landing Page first.
+        // So we do NOTHING. They will click "Get Started" to trigger onboarding manually.
       }
     } else {
       // No session. 
