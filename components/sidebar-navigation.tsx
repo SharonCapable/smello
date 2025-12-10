@@ -197,6 +197,11 @@ function SidebarContent({
         )}
       </div>
 
+      {/* User Profile (Moved to Top) */}
+      {(!isCollapsed || isMobile) && (
+        <UserProfile />
+      )}
+
       {/* Usage Counter */}
       {(!isCollapsed || isMobile) && (
         <div className="px-4 py-2 border-b border-border/50">
@@ -314,8 +319,6 @@ function SidebarContent({
         </Button>
       </div>
 
-      {/* User Profile */}
-      {(!isCollapsed || isMobile) && <UserProfile />}
     </div>
   )
 }

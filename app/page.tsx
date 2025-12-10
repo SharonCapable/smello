@@ -112,25 +112,42 @@ export default function HomePage() {
     // Check existing permanent onboarding status
     const onboardingData = localStorage.getItem("smello-user-onboarding")
 
-    if (onboardingData) {
-      const data = JSON.parse(onboardingData)
-      // If authenticated or just revisiting
-      if (data.usageType === "team") {
-        setAppState("team-dashboard")
+    // ONLY redirect if we are in a 'neutral' or 'auth' state.
+    // If the user is already doing work (e.g., appState is 'research-agent'), we shouldn't disruptive them 
+    // just because the session revalidated.
+    const isTransitionState = appState === "landing" || appState === "onboarding"
+
+    if (session) {
+      if (onboardingData) {
+        const data = JSON.parse(onboardingData)
+        // If we are currently in landing/onboarding, move them to their dashboard
+        if (isTransitionState) {
+          if (data.usageType === "team") {
+            setAppState("team-dashboard")
+          } else {
+            setAppState("workflow-home")
+          }
+        }
       } else {
-        setAppState("workflow-home")
+        // Session exists but no onboarding data -> Force onboarding
+        // We allow 'onboarding' state to persist, but if they are on 'landing', move to onboarding
+        if (appState === "landing") {
+          setAppState("onboarding")
+        }
       }
     } else {
-      // If logged in via top-right button but no onboarding data exists?
-      // We should probably force them to onboarding to collect Role/UsageType
-      if (session) {
-        setAppState("onboarding")
-      } else {
-        // Not logged in, not onboarded -> Landing
+      // No session. 
+      // If they are in a protected route, effectively they should probably go to landing? 
+      // But for now, let's just handle the explicit transition states.
+      // If they were onboarding, they might have refreshed. 
+      if (appState !== "landing" && appState !== "onboarding") {
+        // Allow browsing if we support public tools? 
+        // Currently apps seem protected by this logic.
+        // If they log out, we probably want to send them to landing.
         setAppState("landing")
       }
     }
-  }, [session])
+  }, [session, appState]) // Added appState dependency to correctly check current state
 
   useEffect(() => {
     if (entryMode === 'pdf' && parsedPdfText && !showEditableExtract) {
@@ -314,7 +331,10 @@ export default function HomePage() {
   }
 
   if (appState === "onboarding") {
-    return <OnboardingFlow onComplete={handleOnboardingComplete} />
+    return <OnboardingFlow
+      onComplete={handleOnboardingComplete}
+      isAuthenticated={!!session}
+    />
   }
 
   if (appState === "team-dashboard") {

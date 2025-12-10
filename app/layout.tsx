@@ -13,6 +13,9 @@ export const metadata: Metadata = {
   title: "SMELLO Product Management Toolkit",
   description: "SMELLO: Your Product Management starter pack. Prioritize features, generate ideas & user stories, manage research, and integrate with JIRA/Slack/Google Drive.",
   generator: "v0.app",
+  icons: {
+    icon: '/favicon.ico',
+  },
 }
 
 export default function RootLayout({
