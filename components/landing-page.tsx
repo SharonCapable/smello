@@ -33,7 +33,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
                             <a href="#teams" className="hover:text-foreground transition-colors">For Teams</a>
                             <a href="#pricing" className="hover:text-foreground transition-colors">Pricing</a>
                         </nav>
-                        <Button variant="ghost" className="font-medium" onClick={() => signIn("google")}>Sign In</Button>
+                        <Button variant="ghost" className="font-medium" onClick={() => signIn("google", { callbackUrl: "/onboarding" })}>Sign In</Button>
                         <Button onClick={onGetStarted} className="font-medium shadow-lg shadow-primary/20">Get Started</Button>
                     </div>
                 </div>

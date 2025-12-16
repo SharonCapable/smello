@@ -37,8 +37,6 @@ import {
   ChevronRight
 } from "lucide-react"
 import { useTheme } from "next-themes"
-import { UsageCounterBadge } from "@/components/usage-counter-badge"
-import { UserProfile } from "@/components/user-profile"
 
 type AppState =
   | "landing"
@@ -196,18 +194,6 @@ function SidebarContent({
           </Badge>
         )}
       </div>
-
-      {/* User Profile (Moved to Top) */}
-      {(!isCollapsed || isMobile) && (
-        <UserProfile />
-      )}
-
-      {/* Usage Counter */}
-      {(!isCollapsed || isMobile) && (
-        <div className="px-4 py-2 border-b border-border/50">
-          <UsageCounterBadge />
-        </div>
-      )}
 
       {/* Back Button (when not on home) */}
       {showBackButton && (!isCollapsed || isMobile) && (

@@ -1,3 +1,55 @@
+import React from 'react'
+
+export default function TermsPage() {
+  return (
+    <main style={{padding: '2rem', maxWidth: 900, margin: '0 auto'}}>
+      <h1>Terms of Service</h1>
+      <p>Last updated: December 16, 2025</p>
+
+      <section>
+        <h2>Overview</h2>
+        <p>
+          These Terms of Service govern your use of SMELLO. By using SMELLO, you agree to
+          these terms. If you do not agree, do not use the service.
+        </p>
+      </section>
+
+      <section>
+        <h2>User content</h2>
+        <p>
+          You retain ownership of content you upload to SMELLO. You grant SMELLO a limited
+          license to store and process that content to provide the service.
+        </p>
+      </section>
+
+      <section>
+        <h2>Account responsibilities</h2>
+        <p>
+          You are responsible for maintaining the security of your account and for any
+          activity that occurs under your account.
+        </p>
+      </section>
+
+      <section>
+        <h2>Limitations and liability</h2>
+        <p>
+          SMELLO provides the service "as is" and disclaims certain warranties. Liability
+          is limited to the maximum extent permitted by law.
+        </p>
+      </section>
+
+      <section>
+        <h2>Governing law</h2>
+        <p>These terms are governed by applicable law where SMELLO operates.</p>
+      </section>
+
+      <section>
+        <h2>Contact</h2>
+        <p>Questions? Contact sharon@ayadata.ai</p>
+      </section>
+    </main>
+  )
+}
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function TermsOfService() {

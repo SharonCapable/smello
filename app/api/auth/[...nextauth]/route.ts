@@ -17,12 +17,20 @@ export const authOptions = {
         }),
     ],
     callbacks: {
-        async jwt({ token, account, profile }: any) {
-            // Persist the OAuth access_token to the token right after signin
+        async signIn({ user, account, profile }: any) {
+            // This runs on successful sign-in
+            // We'll create/update user profile in Firestore on client side
+            return true
+        },
+        async jwt({ token, account, profile, user }: any) {
+            // Persist the OAuth access_token and user ID to the token right after signin
             if (account) {
                 token.accessToken = account.access_token
                 token.refreshToken = account.refresh_token
                 token.expiresAt = account.expires_at
+            }
+            if (user) {
+                token.uid = user.id
             }
             return token
         },
@@ -31,6 +39,7 @@ export const authOptions = {
             session.accessToken = token.accessToken
             session.refreshToken = token.refreshToken
             session.expiresAt = token.expiresAt
+            session.user.uid = token.uid || token.sub // Use sub as fallback (NextAuth's default user ID)
             return session
         },
     },
@@ -42,6 +51,8 @@ export const authOptions = {
         strategy: "jwt" as const,
         maxAge: 30 * 24 * 60 * 60, // 30 days
     },
+    // Events for analytics/monitoring can be added here without logging sensitive data
+    events: {},
 }
 
 const handler = NextAuth(authOptions)

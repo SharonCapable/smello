@@ -37,6 +37,7 @@ import { useSession } from "next-auth/react"
 import { LandingPage } from "@/components/landing-page"
 import { OnboardingFlow } from "@/components/onboarding-flow"
 import { TeamDashboard } from "@/components/team-dashboard"
+import { AppHeader } from "@/components/app-header"
 
 type AppState =
   | "landing"
@@ -354,7 +355,10 @@ export default function HomePage() {
         showBackButton={appState !== "workflow-home" && appState !== "home"}
       />
 
-      <main className="flex-1 container mx-auto px-6 py-16 overflow-x-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <AppHeader />
+
+        <main className="flex-1 container mx-auto px-6 py-8 overflow-x-hidden overflow-y-auto">
         {/* Workflow Home - Main Dashboard for PMs */}
         {appState === 'workflow-home' && (
           <WorkflowHome
@@ -564,7 +568,8 @@ export default function HomePage() {
             onBack={() => setAppState("workflow-home")}
           />
         )}
-      </main>
+        </main>
+      </div>
     </div>
   )
 }

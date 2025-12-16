@@ -33,11 +33,15 @@ export async function POST(req: Request) {
         }
 
         if (provider === "gemini") {
+            // Use x-goog-api-key header instead of query param for better security
             const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent",
                 {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: {
+                        "Content-Type": "application/json",
+                        "x-goog-api-key": apiKey
+                    },
                     body: JSON.stringify({
                         contents: [{ parts: [{ text: prompt }] }],
                         generationConfig: { temperature: 0.7 }
@@ -57,7 +61,8 @@ export async function POST(req: Request) {
 
         return NextResponse.json({ error: "Invalid provider" }, { status: 400 })
     } catch (error) {
-        console.error("Generation API Error:", error)
+        // Log error without exposing sensitive data
+        console.error("Generation API Error:", error instanceof Error ? error.message : "Unknown error")
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
     }
 }

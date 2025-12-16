@@ -1,3 +1,70 @@
+import React from 'react'
+
+export default function PrivacyPage() {
+  return (
+    <main style={{padding: '2rem', maxWidth: 900, margin: '0 auto'}}>
+      <h1>Privacy Policy</h1>
+      <p>Last updated: December 16, 2025</p>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          SMELLO (“we”, “us”) provides a product that helps teams generate and manage
+          product content using AI. This privacy policy explains what data we collect,
+          how we use it, and your rights.
+        </p>
+      </section>
+
+      <section>
+        <h2>Data we collect</h2>
+        <ul>
+          <li>Account information (email, name) obtained from Google when you sign in.</li>
+          <li>Content you upload or authorize SMELLO to access (documents, queries).</li>
+          <li>Usage metadata (timestamps, feature usage, logs).</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>How we use data</h2>
+        <ul>
+          <li>Authentication and account setup.</li>
+          <li>Providing features such as search, collaboration, and AI generation.</li>
+          <li>Improving and securing the service.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Third-party services</h2>
+        <p>
+          We use Google APIs for sign-in and optional generative features. When you enable
+          integrations, content may be sent to third-party APIs (e.g. Google Generative API)
+          with your explicit consent.
+        </p>
+      </section>
+
+      <section>
+        <h2>Retention and deletion</h2>
+        <p>
+          You can request account deletion; we will delete user content within 30 days unless
+          legal requirements prevent deletion sooner.
+        </p>
+      </section>
+
+      <section>
+        <h2>Security</h2>
+        <p>
+          We follow industry practices to protect data: HTTPS in transit, secure storage of
+          credentials, and access controls.
+        </p>
+      </section>
+
+      <section>
+        <h2>Contact</h2>
+        <p>For privacy requests or questions: sharon@ayadata.ai</p>
+      </section>
+    </main>
+  )
+}
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function PrivacyPolicy() {

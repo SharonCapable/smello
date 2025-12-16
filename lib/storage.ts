@@ -7,16 +7,47 @@ export interface StoredProject extends ProjectData {
   name: string
   documentContent?: string
   documentFileName?: string
-  prd?: string
+
+  // Ideas & Research
+  generatedIdeas?: any[]
+  selectedIdea?: any
+  research?: any[]
+  competitorAnalysis?: any
+
+  // PRD - can be string (legacy) or object with sections
+  prd?: string | {
+    problemStatement?: string
+    goalsNonGoals?: string
+    personas?: string
+    userStories?: string
+    userFlows?: string
+    functionalRequirements?: string
+    nonFunctionalRequirements?: string
+    analytics?: string
+    risks?: string
+    fullDocument?: string
+  }
+
+  // User Journey & Personas
+  journeyMaps?: any[]
+  personas?: any[]
+
+  // Technical Artifacts
   blueprints?: {
     architecture?: string
     database?: string
     api?: string
+    frontend?: string
+    backend?: string
   }
-  research?: any[]
-  competitorAnalysis?: any
-  personas?: any[]
-  journeyMaps?: any[]
+
+  // Roadmap & Strategy
+  roadmap?: any
+  featurePrioritization?: any
+
+  // Pitch & Risk
+  pitchDeck?: any
+  riskAnalysis?: any
 }
 
 // Get all stored projects

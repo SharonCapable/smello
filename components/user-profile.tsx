@@ -15,6 +15,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { LogIn, LogOut, User, Settings, Sparkles, Zap, Brain, Briefcase } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { GlobalUsageCounter } from "@/lib/global-usage-counter"
+import { getUserProfile } from "@/lib/firestore-service"
+import { setUserId } from "@/lib/storage-hybrid"
 
 export function UserProfile() {
     const { data: session, status } = useSession()
@@ -28,23 +30,33 @@ export function UserProfile() {
         setMounted(true)
         updateStatus()
 
-        // Load user name and role from onboarding data
-        if (typeof window !== 'undefined') {
-            const onboardingData = localStorage.getItem('smello-user-onboarding')
-            if (onboardingData) {
+        // Load user profile from Firestore
+        const loadUserProfile = async () => {
+            if (session?.user) {
                 try {
-                    const data = JSON.parse(onboardingData)
-                    if (data.role) setUserRole(data.role)
-                    if (data.name) setUserName(data.name)
-                } catch (e) {
-                    console.error("Failed to parse onboarding data")
+                    const uid = (session.user as any).uid || session.user.email?.replace(/[^a-zA-Z0-9]/g, '_')
+                    if (uid) {
+                        // Set user ID for hybrid storage
+                        setUserId(uid)
+
+                        // Load profile from Firestore
+                        const profile = await getUserProfile(uid)
+                        if (profile) {
+                            if (profile.role) setUserRole(profile.role)
+                            if (profile.name) setUserName(profile.name)
+                        }
+                    }
+                } catch (error) {
+                    console.error("Error loading user profile:", error)
                 }
             }
         }
 
+        loadUserProfile()
+
         const interval = setInterval(updateStatus, 5000) // Update every 5s
         return () => clearInterval(interval)
-    }, [])
+    }, [session])
 
     const updateStatus = () => {
         // Usage
@@ -95,7 +107,7 @@ export function UserProfile() {
         return (
             <div className="p-4 border-t border-border/50">
                 <Button
-                    onClick={() => signIn("google")}
+                    onClick={() => signIn("google", { callbackUrl: "/onboarding" })}
                     className="w-full justify-start gap-2"
                     variant="outline"
                 >
@@ -199,10 +211,10 @@ export function UserProfile() {
                         Settings & API Keys
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => {
-                        console.log("Signing out...");
-                        signOut({ callbackUrl: '/' });
-                    }} className="text-red-500 focus:text-red-500 cursor-pointer">
+                    <DropdownMenuItem
+                        onClick={() => signOut({ callbackUrl: '/' })}
+                        className="text-red-500 focus:text-red-500 cursor-pointer"
+                    >
                         <LogOut className="w-4 h-4 mr-2" />
                         Sign Out
                     </DropdownMenuItem>

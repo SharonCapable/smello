@@ -6,8 +6,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { User, Briefcase, ArrowRight, CheckCircle2, Lock, LogIn, Loader2 } from "lucide-react"
 import { signIn } from "next-auth/react"
+
+const PREDEFINED_ROLES = [
+  "Product Manager",
+  "Product Owner",
+  "Founder / CEO",
+  "CTO / Technical Lead",
+  "Designer",
+  "Developer / Engineer",
+  "Business Analyst",
+  "Project Manager",
+  "Consultant",
+  "Student",
+  "Other",
+]
 
 interface OnboardingData {
     name: string
@@ -94,16 +115,28 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack }: Onboardi
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="role" className="text-base">What is your role?</Label>
-                                <div className="relative">
-                                    <Briefcase className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
+                                <Select value={data.role} onValueChange={(val) => setData({ ...data, role: val })}>
+                                    <SelectTrigger className="h-12 text-lg">
+                                        <div className="flex items-center gap-2">
+                                            <Briefcase className="h-5 w-5 text-muted-foreground" />
+                                            <SelectValue placeholder="Select your role" />
+                                        </div>
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {PREDEFINED_ROLES.map((role) => (
+                                            <SelectItem key={role} value={role} className="text-base">
+                                                {role}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                {data.role === "Other" && (
                                     <Input
-                                        id="role"
-                                        placeholder="Product Manager, Founder, Developer..."
-                                        className="pl-10 h-12 text-lg"
-                                        value={data.role}
-                                        onChange={(e) => setData({ ...data, role: e.target.value })}
+                                        placeholder="Please specify your role..."
+                                        className="h-10 mt-2"
+                                        onChange={(e) => setData({ ...data, role: e.target.value || "Other" })}
                                     />
-                                </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -155,13 +188,13 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack }: Onboardi
                             {isAuthenticated ? (
                                 // Authenticated View
                                 <>
-                                    <div className="w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                                        <CheckCircle2 className="w-8 h-8 text-green-500" />
+                                    <div className="w-16 h-16 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <CheckCircle2 className="w-8 h-8 text-accent" />
                                     </div>
                                     <div className="space-y-2">
-                                        <h3 className="text-xl font-medium">Account Verified</h3>
+                                        <h3 className="text-xl font-medium">You're All Set!</h3>
                                         <p className="text-muted-foreground max-w-sm mx-auto">
-                                            You are signed in as a verified user. Ready to launch?
+                                            Your account is ready. Let's start building your product!
                                         </p>
                                     </div>
                                     <Button
@@ -241,7 +274,7 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack }: Onboardi
                                 size="lg"
                                 className="ml-auto px-8"
                                 onClick={handleNext}
-                                disabled={step === 1 && !data.name.trim()}
+                                disabled={step === 1 && (!data.name.trim() || !data.role.trim())}
                             >
                                 Next Step
                                 <ArrowRight className="w-4 h-4 ml-2" />

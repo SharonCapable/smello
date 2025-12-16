@@ -14,6 +14,8 @@ import { ApiKeyManager } from "@/lib/api-key-manager"
 import { ApiKeySetup } from "@/components/api-key-setup"
 import { MarkdownRenderer } from "@/components/markdown-renderer"
 import type { StoredProject } from "@/lib/storage"
+import { savePRDToProject } from "@/lib/project-artifacts-manager"
+import { useRouter } from "next/navigation"
 
 interface PRDGeneratorProps {
     project?: StoredProject | null
@@ -53,8 +55,10 @@ const SECTION_TYPES: { type: PRDSectionType; label: string; description: string 
 export function PRDGenerator({ project, onBack }: PRDGeneratorProps) {
     const [sections, setSections] = useState<PRDSection[]>([])
     const [isGenerating, setIsGenerating] = useState(false)
+    const [isSaving, setIsSaving] = useState(false)
     const [showApiKeySetup, setShowApiKeySetup] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [saveSuccess, setSaveSuccess] = useState(false)
     const [context, setContext] = useState(project ? `Product: ${project.product.name}\nDescription: ${project.product.description}\nTarget Audience: ${project.product.target_audience}` : "")
 
     const handleAddSection = (type: PRDSectionType) => {
@@ -148,6 +152,65 @@ export function PRDGenerator({ project, onBack }: PRDGeneratorProps) {
         }
     }
 
+    const handleSaveToProject = async () => {
+        if (!project?.id) {
+            setError("No project selected. Please create a project first.")
+            return
+        }
+
+        setIsSaving(true)
+        setError(null)
+        setSaveSuccess(false)
+
+        try {
+            // Build PRD object from sections
+            const prdData: any = {
+                fullDocument: sections.map(s => `# ${s.title}\n\n${s.content}\n`).join("\n---\n\n")
+            }
+
+            // Map sections to specific fields
+            sections.forEach(section => {
+                switch (section.type) {
+                    case "problem_statement":
+                        prdData.problemStatement = section.content
+                        break
+                    case "goals_nongoals":
+                        prdData.goalsNonGoals = section.content
+                        break
+                    case "personas":
+                        prdData.personas = section.content
+                        break
+                    case "user_flows":
+                        prdData.userFlows = section.content
+                        break
+                    case "functional_requirements":
+                        prdData.functionalRequirements = section.content
+                        break
+                    case "non_functional_requirements":
+                        prdData.nonFunctionalRequirements = section.content
+                        break
+                    case "analytics":
+                        prdData.analytics = section.content
+                        break
+                    case "risks":
+                        prdData.risks = section.content
+                        break
+                }
+            })
+
+            await savePRDToProject(project.id, prdData)
+            setSaveSuccess(true)
+
+            // Clear success message after 3 seconds
+            setTimeout(() => setSaveSuccess(false), 3000)
+        } catch (error) {
+            console.error("Error saving PRD:", error)
+            setError("Failed to save PRD to project")
+        } finally {
+            setIsSaving(false)
+        }
+    }
+
     const handleExport = () => {
         const content = sections.map(s => `# ${s.title}\n\n${s.content}\n`).join("\n---\n\n")
         const blob = new Blob([content], { type: "text/markdown" })
@@ -181,12 +244,33 @@ export function PRDGenerator({ project, onBack }: PRDGeneratorProps) {
                 </div>
                 <div className="flex gap-2">
                     <Button variant="outline" onClick={onBack}>Back</Button>
+                    {project && (
+                        <Button onClick={handleSaveToProject} disabled={sections.length === 0 || isSaving} variant={saveSuccess ? "default" : "outline"}>
+                            <Save className="w-4 h-4 mr-2" />
+                            {isSaving ? "Saving..." : saveSuccess ? "Saved!" : "Save to Project"}
+                        </Button>
+                    )}
                     <Button onClick={handleExport} disabled={sections.length === 0}>
                         <Download className="w-4 h-4 mr-2" />
                         Export Markdown
                     </Button>
                 </div>
             </div>
+
+            {/* Success/Error Messages */}
+            {saveSuccess && (
+                <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-4 flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    <span className="text-green-700 dark:text-green-300">PRD successfully saved to project!</span>
+                </div>
+            )}
+
+            {error && (
+                <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                    <span className="text-red-700 dark:text-red-300">{error}</span>
+                </div>
+            )}
 
             <Card>
                 <CardHeader>
