@@ -9,10 +9,20 @@ export async function POST(req: Request) {
         }
 
         if (provider === "gemini") {
-            // Validate Gemini Key
+            // Validate Gemini Key by making a small generation request using header-based API key
             const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp?key=${apiKey}`,
-                { method: "GET" }
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "x-goog-api-key": apiKey,
+                    },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: "Validate key" }] }],
+                        generationConfig: { temperature: 0.0, maxOutputTokens: 1 },
+                    }),
+                }
             )
 
             if (response.ok) {

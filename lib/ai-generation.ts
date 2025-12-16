@@ -10,18 +10,11 @@ export interface GenerationOptions {
   provider?: 'gemini' | 'anthropic'
 }
 
-async function generateTextWithGemini(prompt: string, apiKey: string): Promise<string> {
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.7,
-      }
-    }),
+async function generateTextWithGemini(prompt: string): Promise<string> {
+  const response = await fetch('/api/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ provider: 'gemini', prompt, model: 'gemini-2.0-flash-exp' }),
   })
 
   if (!response.ok) {
@@ -33,7 +26,7 @@ async function generateTextWithGemini(prompt: string, apiKey: string): Promise<s
   const content = data.candidates?.[0]?.content?.parts?.[0]?.text
 
   if (!content) {
-    throw new Error("No content received from Gemini")
+    throw new Error('No content received from Gemini')
   }
 
   return content
@@ -70,7 +63,7 @@ async function generateText(prompt: string, provider: 'gemini' | 'anthropic' = '
   }
 
   if (provider === 'gemini') {
-    return generateTextWithGemini(prompt, apiKey)
+    return generateTextWithGemini(prompt)
   } else {
     return generateTextWithClaude(prompt, apiKey)
   }

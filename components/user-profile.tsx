@@ -15,7 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { LogIn, LogOut, User, Settings, Sparkles, Zap, Brain, Briefcase } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { GlobalUsageCounter } from "@/lib/global-usage-counter"
-import { getUserProfile } from "@/lib/firestore-service"
+import { useRouter } from 'next/navigation'
 import { setUserId } from "@/lib/storage-hybrid"
 
 export function UserProfile() {
@@ -25,6 +25,7 @@ export function UserProfile() {
     const [activeProvider, setActiveProvider] = useState<string | null>(null)
     const [userRole, setUserRole] = useState<string>("")
     const [userName, setUserName] = useState<string>("")
+    const router = useRouter()
 
     useEffect(() => {
         setMounted(true)
@@ -40,10 +41,20 @@ export function UserProfile() {
                         setUserId(uid)
 
                         // Load profile from Firestore
-                        const profile = await getUserProfile(uid)
-                        if (profile) {
-                            if (profile.role) setUserRole(profile.role)
-                            if (profile.name) setUserName(profile.name)
+                        // Fetch profile from server-side API (firebase-admin) to avoid client rules issues
+                        try {
+                            const res = await fetch(`/api/profile/${uid}`)
+                            if (res.ok) {
+                                const profile = await res.json()
+                                if (profile) {
+                                    if (profile.role) setUserRole(profile.role)
+                                    if (profile.name) setUserName(profile.name)
+                                }
+                            } else {
+                                console.warn('Profile API responded with', res.status)
+                            }
+                        } catch (e) {
+                            console.error('Failed to fetch profile from server API', e)
                         }
                     }
                 } catch (error) {
@@ -202,7 +213,7 @@ export function UserProfile() {
                     </div>
 
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push('/onboarding')}>
                         <User className="w-4 h-4 mr-2" />
                         Profile Details
                     </DropdownMenuItem>
@@ -212,7 +223,7 @@ export function UserProfile() {
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
-                        onClick={() => signOut({ callbackUrl: '/' })}
+                        onClick={async () => { await signOut({ callbackUrl: '/' }); router.push('/') }}
                         className="text-red-500 focus:text-red-500 cursor-pointer"
                     >
                         <LogOut className="w-4 h-4 mr-2" />

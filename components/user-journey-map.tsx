@@ -84,8 +84,7 @@ export function UserJourneyMap({ project, onBack }: UserJourneyMapProps) {
         setError(null)
 
         try {
-            const apiKey = ApiKeyManager.getApiKey('gemini')
-            if (!apiKey) throw new Error("No Gemini API key configured")
+            // Call server proxy so API keys are not exposed in client URLs
 
             const prompt = `
         Context:
@@ -117,22 +116,13 @@ export function UserJourneyMap({ project, onBack }: UserJourneyMapProps) {
         ]
       `
 
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: {
-                        temperature: 0.7,
-                    }
-                }),
+            const response = await fetch('/api/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ provider: 'gemini', prompt, model: 'gemini-2.0-flash-exp' }),
             })
 
-            if (!response.ok) {
-                throw new Error("Failed to generate content")
-            }
+            if (!response.ok) throw new Error('Failed to generate content')
 
             const data = await response.json()
             const content = data.candidates?.[0]?.content?.parts?.[0]?.text

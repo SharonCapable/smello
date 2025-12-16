@@ -14,22 +14,41 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase (singleton pattern)
-let app: FirebaseApp;
-let auth: Auth;
-let db: Firestore;
-let storage: FirebaseStorage;
+let app: FirebaseApp | undefined;
+let auth: Auth | undefined;
+let db: Firestore | undefined;
+let storage: FirebaseStorage | undefined;
+
+const isFirebaseConfigured = Boolean(
+  firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.appId
+);
 
 if (typeof window !== 'undefined') {
-  // Client-side initialization
-  if (!getApps().length) {
-    app = initializeApp(firebaseConfig);
-  } else {
-    app = getApps()[0];
-  }
+  // Client-side initialization — make tolerant for missing envs
+  try {
+    if (!isFirebaseConfigured) {
+      // Do not attempt to initialize Firebase without required public config
+      // This prevents runtime exceptions in production when env vars are missing.
+      // Consumers should check exported values before using them.
+      // eslint-disable-next-line no-console
+      console.warn('Firebase not initialized: missing NEXT_PUBLIC_FIREBASE_* configuration');
+    } else {
+      if (!getApps().length) {
+        app = initializeApp(firebaseConfig as any);
+      } else {
+        app = getApps()[0];
+      }
 
-  auth = getAuth(app);
-  db = getFirestore(app);
-  storage = getStorage(app);
+      if (app) {
+        auth = getAuth(app);
+        db = getFirestore(app);
+        storage = getStorage(app);
+      }
+    }
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('Firebase initialization error:', e);
+  }
 }
 
-export { app, auth, db, storage };
+export { app, auth, db, storage, isFirebaseConfigured };
