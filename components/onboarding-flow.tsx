@@ -33,6 +33,7 @@ const PREDEFINED_ROLES = [
 interface OnboardingData {
     name: string
     role: string
+    productDescription?: string
     usageType: "personal" | "team"
 }
 
@@ -43,10 +44,11 @@ interface OnboardingFlowProps {
 }
 
 export function OnboardingFlow({ onComplete, isAuthenticated, onBack }: OnboardingFlowProps) {
-    const [step, setStep] = useState<1 | 2 | 3>(1)
+    const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
     const [data, setData] = useState<OnboardingData>({
         name: "",
         role: "",
+        productDescription: "",
         usageType: "personal"
     })
     const [isSigningIn, setIsSigningIn] = useState(false)
@@ -62,10 +64,12 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack }: Onboardi
     }, [isAuthenticated, step])
 
     const handleNext = () => {
-        if (step === 1 && data.name) {
+        if (step === 1 && data.name && data.role) {
             setStep(2)
-        } else if (step === 2) {
+        } else if (step === 2 && data.productDescription) {
             setStep(3)
+        } else if (step === 3) {
+            setStep(4)
         }
     }
 
@@ -90,10 +94,10 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack }: Onboardi
             <Card className="max-w-xl w-full notched-card border shadow-2xl">
                 <CardHeader className="text-center pb-8">
                     <CardTitle className="text-3xl font-bold">
-                        {step === 1 ? "Welcome to SMELLO" : step === 2 ? "Choose Your Path" : isAuthenticated ? "Confirm Setup" : "Create Your Account"}
+                        {step === 1 ? "Welcome to SMELLO" : step === 2 ? "Tell Us About Your Product" : step === 3 ? "Choose Your Path" : isAuthenticated ? "Confirm Setup" : "Create Your Account"}
                     </CardTitle>
                     <CardDescription className="text-lg">
-                        {step === 1 ? "Let's get to know you better" : step === 2 ? "How do you plan to use Smello?" : isAuthenticated ? "You're almost there!" : "Secure your workspace to continue"}
+                        {step === 1 ? "Let's get to know you better" : step === 2 ? "Help us tailor Smello for your needs" : step === 3 ? "How do you plan to use Smello?" : isAuthenticated ? "You're almost there!" : "Secure your workspace to continue"}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-8">
@@ -143,6 +147,38 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack }: Onboardi
 
                     {step === 2 && (
                         <div className="space-y-6 animate-fade-in-up">
+                            <div className="space-y-2">
+                                <Label htmlFor="product" className="text-base">What product are you building or managing?</Label>
+                                <Input
+                                    id="product"
+                                    placeholder="e.g., A mobile app for fitness tracking"
+                                    className="h-12 text-lg"
+                                    value={data.productDescription || ""}
+                                    onChange={(e) => setData({ ...data, productDescription: e.target.value })}
+                                    autoFocus
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="usecase" className="text-base">What's your primary use case?</Label>
+                                <Select>
+                                    <SelectTrigger className="h-12 text-lg">
+                                        <SelectValue placeholder="Select your use case" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="saas">SaaS / Web App</SelectItem>
+                                        <SelectItem value="mobile">Mobile App</SelectItem>
+                                        <SelectItem value="enterprise">Enterprise Software</SelectItem>
+                                        <SelectItem value="internal">Internal Tools</SelectItem>
+                                        <SelectItem value="api">API / Backend</SelectItem>
+                                        <SelectItem value="other">Other</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                    )}
+
+                    {step === 3 && (
+                        <div className="space-y-6 animate-fade-in-up">
                             <RadioGroup
                                 value={data.usageType}
                                 onValueChange={(val) => setData({ ...data, usageType: val as "personal" | "team" })}
@@ -183,7 +219,7 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack }: Onboardi
                         </div>
                     )}
 
-                    {step === 3 && (
+                    {step === 4 && (
                         <div className="space-y-6 animate-fade-in-up text-center">
                             {isAuthenticated ? (
                                 // Authenticated View
@@ -263,18 +299,18 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack }: Onboardi
                             className="text-muted-foreground"
                             onClick={() => {
                                 if (step === 1) onBack()
-                                else setStep(step - 1 as any)
+                                else setStep((step - 1) as any)
                             }}
                         >
                             Back
                         </Button>
 
-                        {step < 3 && (
+                        {step < 4 && (
                             <Button
                                 size="lg"
                                 className="ml-auto px-8"
                                 onClick={handleNext}
-                                disabled={step === 1 && (!data.name.trim() || !data.role.trim())}
+                                disabled={(step === 1 && (!data.name.trim() || !data.role.trim())) || (step === 2 && !data.productDescription?.trim())}
                             >
                                 Next Step
                                 <ArrowRight className="w-4 h-4 ml-2" />
@@ -289,6 +325,7 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack }: Onboardi
                 <div className={`h-1.5 w-12 rounded-full transition-all ${step >= 1 ? "bg-accent" : "bg-muted"}`} />
                 <div className={`h-1.5 w-12 rounded-full transition-all ${step >= 2 ? "bg-accent" : "bg-muted"}`} />
                 <div className={`h-1.5 w-12 rounded-full transition-all ${step >= 3 ? "bg-accent" : "bg-muted"}`} />
+                <div className={`h-1.5 w-12 rounded-full transition-all ${step >= 4 ? "bg-accent" : "bg-muted"}`} />
             </div>
         </div>
     )

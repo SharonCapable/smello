@@ -339,9 +339,8 @@ export default function HomePage() {
 
   if (appState === "team-dashboard") {
     return <TeamDashboard onBack={() => {
-      // Clear onboarding to allow switching back for demo purposes
-      localStorage.removeItem("smello-user-onboarding")
-      setAppState("landing")
+      // Return to mode selection instead of landing
+      setAppState("mode-selection")
     }} />
   }
 
