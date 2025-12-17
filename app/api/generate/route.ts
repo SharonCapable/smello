@@ -70,9 +70,13 @@ export async function POST(req: Request) {
 
     if (provider === 'gemini') {
       // priority: process.env -> session.accessToken (bearer) -> storedKeys.geminiKey -> clientApiKey
+
+      let serverKeyUsed = false
       const envKey = process.env.GEMINI_API_KEY
-      // If we'll use the server env key, enforce per-user free-operation limit
+
+      // 1. Try Server Key (with limit enforcement)
       if (envKey) {
+        let limitExceeded = false
         try {
           initAdmin()
           const db = admin.firestore()
@@ -80,33 +84,39 @@ export async function POST(req: Request) {
           const statsSnap = await statsRef.get()
           const FREE_LIMIT = Number(process.env.FREE_AI_OPERATIONS_LIMIT || 6)
           const current = statsSnap.exists ? (statsSnap.data()?.operationCount || 0) : 0
+
           if (current >= FREE_LIMIT) {
-            console.log(`User ${sessionUid} exceeded free limit: ${current}/${FREE_LIMIT}`)
-            return NextResponse.json({ error: 'free_limit_exceeded', remaining: 0 }, { status: 403 })
+            console.log(`User ${sessionUid} exceeded free limit (server key skipped): ${current}/${FREE_LIMIT}`)
+            limitExceeded = true
+          } else {
+            // Increment and Use
+            await statsRef.set({ userId: sessionUid, operationCount: admin.firestore.FieldValue.increment(1), updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true })
+
+            const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-goog-api-key': envKey },
+              body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.7 } }),
+            })
+
+            if (!response.ok) {
+              // If server key fails for some API reason, maybe we shouldn't fallback? Or maybe we should?
+              // For now, let's treat API failure as final if we attempted it.
+              const errorData = await response.json().catch(() => ({}))
+              return NextResponse.json({ error: errorData.error?.message || 'Gemini API Error' }, { status: response.status })
+            }
+
+            const data = await response.json()
+            return NextResponse.json(data)
           }
-          // increment counter by one for this generation action
-          await statsRef.set({ userId: sessionUid, operationCount: admin.firestore.FieldValue.increment(1), updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true })
-
-          const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': envKey },
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.7 } }),
-          })
-
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}))
-            return NextResponse.json({ error: errorData.error?.message || 'Gemini API Error' }, { status: response.status })
-          }
-
-          const data = await response.json()
-          return NextResponse.json(data)
         } catch (e: any) {
           console.error('generate gemini server-key error', e)
-          return NextResponse.json({ error: 'server_error' }, { status: 500 })
+          // If error is internal system error, maybe we skip to next method?
         }
       }
 
-      // Use user's Google OAuth access token if available. If expired, attempt refresh with stored refresh token.
+      // 2. OAuth Token (Gemini specific)
+      // Only runs if server key was missing or limit exceeded
+
       if (sessionAccessToken) {
         let accessTokenToUse = sessionAccessToken
         try {
