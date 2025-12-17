@@ -57,17 +57,11 @@ export function RiskAnalysis({ project, onBack }: RiskAnalysisProps) {
     }
 
     const handleGenerate = async () => {
-        if (!ApiKeyManager.hasApiKey()) {
-            setShowApiKeySetup(true)
-            return
-        }
-
+        // Delegate key selection and quota enforcement to server `/api/generate`.
         setIsGenerating(true)
         setError(null)
 
         try {
-            const apiKey = ApiKeyManager.getApiKey('gemini')
-            if (!apiKey) throw new Error("No Gemini API key configured")
 
             const prompt = `
         Context:

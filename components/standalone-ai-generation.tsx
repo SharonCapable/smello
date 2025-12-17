@@ -63,10 +63,7 @@ export function StandaloneAIGeneration({ onBack }: StandaloneAIGenerationProps) 
   const [error, setError] = useState<string | null>(null)
 
   const checkApiKey = () => {
-    if (!ApiKeyManager.hasApiKey(provider)) {
-      setShowApiKeySetup(true)
-      return false
-    }
+    // Do not block client-side. Server will enforce quota and key selection.
     return true
   }
 

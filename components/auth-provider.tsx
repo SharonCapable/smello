@@ -2,6 +2,7 @@
 
 import { SessionProvider, useSession } from "next-auth/react"
 import { useEffect } from "react"
+import { ApiKeyManager } from '@/lib/api-key-manager'
 // Use server-side profile API to avoid client Firestore permission issues
 
 function AuthSync({ children }: { children: React.ReactNode }) {
@@ -39,6 +40,12 @@ function AuthSync({ children }: { children: React.ReactNode }) {
             }
 
             syncUserProfile()
+            // Load server-stored API keys into local storage when user signs in
+            try {
+                ApiKeyManager.loadServerKeys().catch(() => {})
+            } catch (e) {
+                // ignore
+            }
         }
     }, [session, status])
 
