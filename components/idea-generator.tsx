@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -57,6 +57,33 @@ export function IdeaGenerator({ onCreateProject, onBack }: IdeaGeneratorProps) {
   const [error, setError] = useState<string | null>(null)
   const [selectedModel, setSelectedModel] = useState<'Gemini' | 'Claude'>('Gemini');
 
+  /* New useEffect to persist ideas state */
+  useEffect(() => {
+    const saved = sessionStorage.getItem("smello-idea-generator-state");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setGeneratedIdeas(parsed.generatedIdeas || []);
+        setEditableIdeas(parsed.editableIdeas || []);
+        if (parsed.keyword) setKeyword(parsed.keyword);
+        if (parsed.selectedSector) setSelectedSector(parsed.selectedSector);
+      } catch (e) {
+        console.error("Failed to restore idea state", e);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (generatedIdeas.length > 0) {
+      sessionStorage.setItem("smello-idea-generator-state", JSON.stringify({
+        generatedIdeas,
+        editableIdeas,
+        keyword,
+        selectedSector
+      }));
+    }
+  }, [generatedIdeas, editableIdeas, keyword, selectedSector]);
+
   const handleGenerate = async () => {
     // Delegate quota enforcement to the server; do not block client-side.
     setIsGenerating(true)
@@ -71,6 +98,10 @@ export function IdeaGenerator({ onCreateProject, onBack }: IdeaGeneratorProps) {
       }
       setGeneratedIdeas(ideas);
       setEditableIdeas(ideas.map(i => ({ ...i })));
+
+      // Track usage locally for immediate UI update
+      GlobalUsageCounter.recordOperation("idea-generation");
+
     } catch (error) {
       console.error("Error generating ideas:", error)
       setError(error instanceof Error ? error.message : "Failed to generate ideas")

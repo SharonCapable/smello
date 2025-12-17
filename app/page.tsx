@@ -83,15 +83,21 @@ export default function HomePage() {
   const [extractedDescription, setExtractedDescription] = useState<string>("");
   const [showEditableExtract, setShowEditableExtract] = useState(false);
 
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
 
   // Workflow state
   const [workflowPhase, setWorkflowPhase] = useState<WorkflowPhase>("ideation")
   const [completedPhases, setCompletedPhases] = useState<WorkflowPhase[]>([])
   const [isGuidedMode, setIsGuidedMode] = useState(false)
 
+  // Loading state for initial profile check
+  const [isCheckingProfile, setIsCheckingProfile] = useState(true)
+
   useEffect(() => {
     setMounted(true)
+
+    // Wait for session to load
+    if (status === "loading") return
 
     // Check for temporary onboarding data (from pre-auth flow)
     const tempOnboardingData = localStorage.getItem("smello-onboarding-temp")
@@ -107,6 +113,7 @@ export default function HomePage() {
       } else {
         setAppState("workflow-home")
       }
+      setIsCheckingProfile(false)
       return // Stop further checks
     }
 
@@ -114,8 +121,6 @@ export default function HomePage() {
     const onboardingData = localStorage.getItem("smello-user-onboarding")
 
     // ONLY redirect if we are in a 'neutral' or 'auth' state.
-    // If the user is already doing work (e.g., appState is 'research-agent'), we shouldn't disruptive them 
-    // just because the session revalidated.
     const isTransitionState = appState === "landing" || appState === "onboarding"
 
     if (session) {
@@ -129,6 +134,7 @@ export default function HomePage() {
             setAppState("workflow-home")
           }
         }
+        setIsCheckingProfile(false)
       } else {
         // Session exists but no onboarding data in local storage.
         // Fetch from server to check if user has already onboarded.
@@ -158,21 +164,19 @@ export default function HomePage() {
               }
             })
             .catch(e => console.error("Failed to sync profile on home load", e))
+            .finally(() => setIsCheckingProfile(false))
+        } else {
+          setIsCheckingProfile(false)
         }
       }
     } else {
       // No session. 
-      // If they are in a protected route, effectively they should probably go to landing? 
-      // But for now, let's just handle the explicit transition states.
-      // If they were onboarding, they might have refreshed. 
       if (appState !== "landing" && appState !== "onboarding") {
-        // Allow browsing if we support public tools? 
-        // Currently apps seem protected by this logic.
-        // If they log out, we probably want to send them to landing.
         setAppState("landing")
       }
+      setIsCheckingProfile(false)
     }
-  }, [session, appState]) // Added appState dependency to correctly check current state
+  }, [session, status, appState]) // Added status dependency
 
   useEffect(() => {
     if (entryMode === 'pdf' && parsedPdfText && !showEditableExtract) {
@@ -348,6 +352,15 @@ export default function HomePage() {
       setCompletedPhases([...completedPhases, workflowPhase])
       setWorkflowPhase(nextPhase)
     }
+  }
+
+  // Show loader while checking session/profile
+  if (status === "loading" || isCheckingProfile) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    )
   }
 
   // Pre-onboarding views (No Sidebar)
