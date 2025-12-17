@@ -4,14 +4,14 @@ import React, { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ApiKeyManager } from '@/lib/api-key-manager'
-import ApiKeySetup from '@/components/api-key-setup'
+import { ApiKeySetup } from '@/components/api-key-setup'
 import { useToast } from '@/hooks/use-toast'
 import { useSession } from 'next-auth/react'
 
 function maskKey(k?: string) {
   if (!k) return 'Not set'
   if (k.length <= 8) return k.replace(/./g, '*')
-  return `${k.slice(0,4)}...${k.slice(-4)}`
+  return `${k.slice(0, 4)}...${k.slice(-4)}`
 }
 
 export default function KeysSettingsPage() {
@@ -31,7 +31,7 @@ export default function KeysSettingsPage() {
         const data = await res.json()
         setKeys(data)
         // merge to local storage as well
-        try { await ApiKeyManager.loadServerKeys() } catch {}
+        try { await ApiKeyManager.loadServerKeys() } catch { }
         setLoading(false)
         return
       }
