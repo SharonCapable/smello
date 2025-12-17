@@ -37,11 +37,8 @@ export default function OnboardingPage() {
 
                             if (userProfile?.onboardingCompleted) {
                                 // Already completed onboarding, redirect to app
-                                if (userProfile.selectedPath === "team") {
-                                    router.push("/teams")
-                                } else {
-                                    router.push("/desktop")
-                                }
+                                // Already completed onboarding, redirect to app logic at home
+                                router.push("/")
                                 return
                             }
                         }
@@ -82,12 +79,16 @@ export default function OnboardingPage() {
                 // Clear any temporary onboarding data from localStorage
                 localStorage.removeItem("smello-onboarding-temp")
 
-                // Redirect to appropriate app section
-                if (data.usageType === "team") {
-                    router.push("/teams")
-                } else {
-                    router.push("/desktop")
+                // Save permanent onboarding data so the home page knows state
+                const permanentData = {
+                    name: data.name,
+                    role: data.role,
+                    usageType: data.usageType
                 }
+                localStorage.setItem("smello-user-onboarding", JSON.stringify(permanentData))
+
+                // Redirect to home (app/page.tsx handles the dashboard view)
+                router.push("/")
             }
         } catch (error) {
             console.error("Error completing onboarding:", error)
