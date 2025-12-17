@@ -32,7 +32,7 @@ async function generateTextWithGemini(prompt: string): Promise<string> {
   return content
 }
 
-async function generateTextWithClaude(prompt: string, apiKey: string): Promise<string> {
+async function generateTextWithClaude(prompt: string, apiKey: string | null): Promise<string> {
   const response = await fetch("/api/generate", {
     method: "POST",
     headers: {
@@ -56,11 +56,7 @@ async function generateTextWithClaude(prompt: string, apiKey: string): Promise<s
 }
 
 async function generateText(prompt: string, provider: 'gemini' | 'anthropic' = 'gemini'): Promise<string> {
-  const apiKey = ApiKeyManager.getApiKey(provider)
-  if (!apiKey) {
-    const providerName = provider === 'gemini' ? 'Gemini' : 'Claude'
-    throw new Error(`No ${providerName} API key configured. Please set your ${providerName} API key in settings.`)
-  }
+  const apiKey = ApiKeyManager.getApiKey(provider) || null
 
   if (provider === 'gemini') {
     return generateTextWithGemini(prompt)
@@ -71,14 +67,6 @@ async function generateText(prompt: string, provider: 'gemini' | 'anthropic' = '
 
 export async function generateEpicsFromProduct(product: Product, options: GenerationOptions = {}): Promise<Epic[]> {
   const provider = options.provider || 'gemini'
-  const isUsingDefaultKey = ApiKeyManager.isUsingDefaultKey(provider)
-
-  // Check global usage counter if using default key
-  if (isUsingDefaultKey) {
-    if (!GlobalUsageCounter.hasRemainingOperations()) {
-      throw new Error("Free tier limit reached! You've used all 6 free AI operations. Please add your own API key in Settings to continue.")
-    }
-  }
 
 
 
@@ -120,11 +108,7 @@ Return ONLY a JSON array of epics with this exact structure:
       user_stories: [],
     }))
 
-    // Update usage stats if using default key
-    if (isUsingDefaultKey) {
-      ApiKeyManager.updateUsageStats(processedEpics.length, 0)
-      GlobalUsageCounter.recordOperation('epic-generation', undefined, `Generated ${processedEpics.length} epics`)
-    }
+    // Usage accounting is handled server-side; client no longer updates usage counters.
 
     return processedEpics
   } catch (error) {
@@ -140,15 +124,6 @@ export async function generateUserStoriesForEpic(
   options: GenerationOptions = {},
 ): Promise<UserStory[]> {
   const provider = options.provider || 'gemini'
-  const isUsingDefaultKey = ApiKeyManager.isUsingDefaultKey(provider)
-
-  // Check limits if using default key
-  if (isUsingDefaultKey) {
-    const remaining = ApiKeyManager.getRemainingLimits()
-    if (remaining.stories <= 0) {
-      throw new Error("Free limit reached! You've generated 3 user stories. Please add your own API key to continue generating unlimited epics and user stories.")
-    }
-  }
 
   const optionsText = Object.entries(options)
     .filter(([_, value]) => value)
@@ -202,10 +177,7 @@ Return ONLY a JSON array with this exact structure:
       user_stories: [],
     }))
 
-    // Update usage stats if using default key
-    if (isUsingDefaultKey) {
-      ApiKeyManager.updateUsageStats(0, processedStories.length)
-    }
+    // Usage accounting handled server-side.
 
     return processedStories
   } catch (error) {

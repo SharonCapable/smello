@@ -38,20 +38,11 @@ export function TechnicalBlueprint({ project, onBack }: TechnicalBlueprintProps)
     })
 
     const handleGenerate = async (type: BlueprintType) => {
-        if (!ApiKeyManager.hasApiKey()) {
-            setShowApiKeySetup(true)
-            return
-        }
-
+        // Delegate key selection and quota enforcement to server `/api/generate`.
         setIsGenerating(true)
         setError(null)
 
         try {
-            const apiKey = ApiKeyManager.getApiKey('anthropic') || ApiKeyManager.getApiKey('gemini')
-            const provider = ApiKeyManager.getApiKey('anthropic') ? 'anthropic' : 'gemini'
-
-            if (!apiKey) throw new Error("No API key configured. Please add your API key in Settings.")
-
             let prompt = ""
             if (type === "architecture") {
                 prompt = `
@@ -115,15 +106,8 @@ export function TechnicalBlueprint({ project, onBack }: TechnicalBlueprintProps)
 
             const response = await fetch("/api/generate", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    provider,
-                    apiKey,
-                    prompt,
-                    model: provider === 'anthropic' ? "claude-3-haiku-20240307" : undefined
-                }),
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ provider: 'gemini', prompt }),
             })
 
             if (!response.ok) {
@@ -132,14 +116,12 @@ export function TechnicalBlueprint({ project, onBack }: TechnicalBlueprintProps)
             }
 
             const data = await response.json()
-            const content = data.text
+            const content = data.candidates?.[0]?.content?.parts?.[0]?.text || data.text
 
             if (content) {
                 setBlueprints(prev => {
                     const newBlueprints = { ...prev, [type]: content }
-                    if (project) {
-                        updateProject(project.id, { blueprints: newBlueprints })
-                    }
+                    if (project) updateProject(project.id, { blueprints: newBlueprints })
                     return newBlueprints
                 })
             }

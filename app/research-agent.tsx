@@ -63,18 +63,13 @@ export default function ResearchAgent() {
   const handleResearch = async () => {
     if (!query.trim()) return;
 
-    // Check usage limit
-    if (!GlobalUsageCounter.hasRemainingOperations()) {
-      setError("You have reached your free daily AI usage limit. Please add your own API Key in Settings to continue.")
-      return
-    }
+
 
     setIsGenerating(true);
     setError(null);
     setCurrentResult(null);
 
-    // Record operation attempt (decrement counter)
-    GlobalUsageCounter.recordOperation("market-research");
+    // Quota enforcement is handled server-side; proceed with request and surface server errors.
 
     try {
       const response = await fetch('/api/research', {

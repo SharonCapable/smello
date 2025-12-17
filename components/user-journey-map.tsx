@@ -75,11 +75,7 @@ export function UserJourneyMap({ project, onBack }: UserJourneyMapProps) {
     }
 
     const handleGenerate = async () => {
-        if (!ApiKeyManager.hasApiKey()) {
-            setShowApiKeySetup(true)
-            return
-        }
-
+        // Delegate key selection and quota enforcement to server `/api/generate`.
         setIsGenerating(true)
         setError(null)
 

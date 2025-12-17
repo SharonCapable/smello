@@ -99,19 +99,8 @@ export class AIServiceManager {
         allowed: boolean
         reason?: string
     } {
-        // No limits for Google account or user API keys
-        if (!config.hasLimits) {
-            return { allowed: true }
-        }
-
-        // Check global usage counter for ENV keys
-        if (!GlobalUsageCounter.hasRemainingOperations()) {
-            return {
-                allowed: false,
-                reason: "Free tier limit reached (6/6 operations used). Please sign in with Google or add your own API key to continue.",
-            }
-        }
-
+        // Client should not block operations; server enforces quota.
+        // Return allowed so UI can attempt operations and surface server responses.
         return { allowed: true }
     }
 

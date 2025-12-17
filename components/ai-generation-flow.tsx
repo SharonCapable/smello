@@ -67,10 +67,7 @@ export function AIGenerationFlow({ onComplete, onBack, initialProduct }: AIGener
   const [error, setError] = useState<string | null>(null)
 
   const checkApiKey = () => {
-    if (!ApiKeyManager.hasApiKey()) {
-      setShowApiKeySetup(true)
-      return false
-    }
+    // Do not block client-side. Server will enforce quota and key selection.
     return true
   }
 

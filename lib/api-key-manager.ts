@@ -69,12 +69,12 @@ export class ApiKeyManager {
   }
 
   static hasApiKey(provider?: 'gemini' | 'anthropic'): boolean {
-    if (provider) {
-      return !!this.getApiKey(provider)
-    }
-    // Check if any API key is available
-    const keys = this.getApiKeys()
-    return !!(keys.gemini || keys.anthropic || this.DEFAULT_GEMINI_KEY || this.DEFAULT_CLAUDE_KEY)
+    // To avoid blocking client flows when no client-side key is configured,
+    // we return permissive true so the client will call the server `/api/generate`
+    // which will select the appropriate key (env / oauth / stored) and enforce
+    // per-user quotas. This prevents many early-returns in the UI while keeping
+    // server-side policy enforcement intact.
+    return true
   }
 
   // ... keep usage stats methods as is ...
@@ -169,5 +169,50 @@ export class ApiKeyManager {
     configs = configs.filter(c => c.provider !== providerId)
 
     localStorage.setItem(this.ENHANCED_STORAGE_KEY, JSON.stringify(configs))
+  }
+
+  // Fetch stored keys from server (if signed in) and merge into local enhanced storage
+  static async loadServerKeys(): Promise<void> {
+    if (typeof window === 'undefined') return
+    try {
+      const res = await fetch('/api/keys')
+      if (!res.ok) return
+      const data = await res.json()
+      const enhancedStored = localStorage.getItem(this.ENHANCED_STORAGE_KEY)
+      let configs: EnhancedApiKeyConfig[] = []
+      if (enhancedStored) {
+        try { configs = JSON.parse(enhancedStored) } catch { configs = [] }
+      }
+
+      if (data.geminiKey) {
+        const idx = configs.findIndex(c => c.provider === 'google')
+        if (idx >= 0) configs[idx] = { ...configs[idx], key: data.geminiKey, isValid: true }
+        else configs.push({ provider: 'google', key: data.geminiKey, isValid: true, lastValidated: new Date().toISOString() })
+      }
+      if (data.claudeKey) {
+        const idx = configs.findIndex(c => c.provider === 'anthropic')
+        if (idx >= 0) configs[idx] = { ...configs[idx], key: data.claudeKey, isValid: true }
+        else configs.push({ provider: 'anthropic', key: data.claudeKey, isValid: true, lastValidated: new Date().toISOString() })
+      }
+
+      if (configs.length > 0) localStorage.setItem(this.ENHANCED_STORAGE_KEY, JSON.stringify(configs))
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // Save keys to server (authenticated). Returns true on success.
+  static async saveServerKeys(keys: { geminiKey?: string; claudeKey?: string }): Promise<boolean> {
+    if (typeof window === 'undefined') return false
+    try {
+      const res = await fetch('/api/keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(keys) })
+      if (!res.ok) return false
+      // Merge into local storage as well
+      if (keys.geminiKey) this.setApiKey(keys.geminiKey, 'gemini')
+      if (keys.claudeKey) this.setApiKey(keys.claudeKey, 'anthropic')
+      return true
+    } catch (e) {
+      return false
+    }
   }
 }

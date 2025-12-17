@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -10,6 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { AlertCircle, Key, Eye, EyeOff } from "lucide-react"
 import { ApiKeyManager } from "@/lib/api-key-manager"
+import { useSession } from 'next-auth/react'
+import { useToast } from '@/hooks/use-toast'
 
 interface ApiKeySetupProps {
   isOpen: boolean
@@ -17,10 +19,29 @@ interface ApiKeySetupProps {
   onClose: () => void
 }
 
-export function ApiKeySetup({ isOpen, onApiKeySet, onClose }: ApiKeySetupProps) {
+interface ApiKeySetupProps {
+  isOpen: boolean
+  onApiKeySet: () => void
+  onClose: () => void
+  initialKey?: string
+}
+
+export function ApiKeySetup({ isOpen, onApiKeySet, onClose, initialKey }: ApiKeySetupProps) {
   const [apiKey, setApiKey] = useState("")
   const [showApiKey, setShowApiKey] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [saveToAccount, setSaveToAccount] = useState(true)
+  const { data: session, status } = useSession()
+  const { toast } = useToast()
+
+  useEffect(() => {
+    // Default save-to-account only when authenticated
+    setSaveToAccount(status === 'authenticated')
+  }, [status])
+
+  useEffect(() => {
+    if (isOpen && initialKey) setApiKey(initialKey)
+  }, [isOpen, initialKey])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -41,13 +62,23 @@ export function ApiKeySetup({ isOpen, onApiKeySet, onClose }: ApiKeySetupProps) 
 
       if (data.valid) {
         ApiKeyManager.setApiKey(apiKey, 'gemini')
+        // Save to account only if user selected the option
+        if (saveToAccount) {
+          try {
+            await ApiKeyManager.saveServerKeys({ geminiKey: apiKey })
+            toast({ title: 'Saved', description: 'API key saved to your account' })
+          } catch (e) {
+            toast({ title: 'Saved locally', description: 'Key stored locally; account save failed' })
+          }
+        }
+
         onApiKeySet()
         setApiKey("")
       } else {
-        alert(data.error || "Invalid API key. Please check your Gemini API key and try again.")
+        toast({ title: 'Invalid key', description: data.error || 'Invalid API key. Please check and try again.', variant: 'destructive' })
       }
     } catch (error) {
-      alert("Failed to validate API key. Please check your internet connection and try again.")
+      toast({ title: 'Validation failed', description: 'Failed to validate API key. Check your connection.', variant: 'destructive' })
     } finally {
       setIsLoading(false)
     }
@@ -117,9 +148,15 @@ export function ApiKeySetup({ isOpen, onApiKeySet, onClose }: ApiKeySetupProps) 
             <Button type="button" variant="outline" onClick={onClose} className="flex-1 bg-transparent">
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading || !apiKey.trim()} className="flex-1">
-              {isLoading ? "Validating..." : "Save API Key"}
-            </Button>
+            <div className="flex items-center gap-2">
+              <label className="flex items-center text-sm">
+                <input type="checkbox" checked={saveToAccount} onChange={(e) => setSaveToAccount(e.target.checked)} className="mr-2" />
+                <span>Save to account</span>
+              </label>
+              <Button type="submit" disabled={isLoading || !apiKey.trim()} className="flex-1">
+                {isLoading ? "Validating..." : "Save API Key"}
+              </Button>
+            </div>
           </div>
         </form>
       </DialogContent>
