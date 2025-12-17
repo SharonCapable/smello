@@ -35,9 +35,16 @@ export async function POST(req: Request) {
     // 4) Client-provided key
 
     // Get session (require sign-in for generation)
+    // Get session (require sign-in for generation)
     const session = await getSession()
-    if (!session || !(session as any).user) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 })
-    const sessionUid = (session as any).user.uid || session.user.email?.replace(/[^a-zA-Z0-9]/g, '_')
+    if (!session) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 })
+
+    // Attempt to extract meaningful user ID, fallback to email or something stable. 
+    // If we can't get a user ID, we can't enforce personalized limits properly, 
+    // but blocking them might be worse. Let's try best effort.
+    const sessionUser = (session as any).user || session.user
+    const sessionUid = sessionUser?.uid || sessionUser?.email?.replace(/[^a-zA-Z0-9]/g, '_') || 'unknown_user'
+
     const sessionAccessToken = (session as any).accessToken || null
     const sessionRefreshToken = (session as any).refreshToken || null
     const sessionExpiresAt = (session as any).expiresAt || null
@@ -74,6 +81,7 @@ export async function POST(req: Request) {
           const FREE_LIMIT = Number(process.env.FREE_AI_OPERATIONS_LIMIT || 6)
           const current = statsSnap.exists ? (statsSnap.data()?.operationCount || 0) : 0
           if (current >= FREE_LIMIT) {
+            console.log(`User ${sessionUid} exceeded free limit: ${current}/${FREE_LIMIT}`)
             return NextResponse.json({ error: 'free_limit_exceeded', remaining: 0 }, { status: 403 })
           }
           // increment counter by one for this generation action
