@@ -15,7 +15,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { LogIn, LogOut, User, Settings, Sparkles, Zap, Brain, Briefcase } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { GlobalUsageCounter } from "@/lib/global-usage-counter"
-import { getUserProfile } from "@/lib/firestore-service"
 import { setUserId } from "@/lib/storage-hybrid"
 import { UsageCounterBadge } from "@/components/usage-counter-badge"
 
@@ -32,6 +31,7 @@ export function AppHeader() {
         updateStatus()
 
         // Load user profile from Firestore
+        // Load user profile from Firestore via Server API
         const loadUserProfile = async () => {
             if (session?.user) {
                 try {
@@ -40,11 +40,14 @@ export function AppHeader() {
                         // Set user ID for hybrid storage
                         setUserId(uid)
 
-                        // Load profile from Firestore
-                        const profile = await getUserProfile(uid)
-                        if (profile) {
-                            if (profile.role) setUserRole(profile.role)
-                            if (profile.name) setUserName(profile.name)
+                        // Load profile from Firestore via API to avoid permission issues
+                        const res = await fetch(`/api/profile/${uid}`)
+                        if (res.ok) {
+                            const profile = await res.json()
+                            if (profile) {
+                                if (profile.role) setUserRole(profile.role)
+                                if (profile.name) setUserName(profile.name)
+                            }
                         }
                     }
                 } catch (error) {

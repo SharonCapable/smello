@@ -4,7 +4,6 @@ import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { OnboardingFlow } from "@/components/onboarding-flow"
-import { getUserProfile } from "@/lib/firestore-service"
 import { Loader2 } from "lucide-react"
 
 interface OnboardingData {
@@ -32,16 +31,19 @@ export default function OnboardingPage() {
                 try {
                     const uid = (session.user as any).uid || session.user.email?.replace(/[^a-zA-Z0-9]/g, '_')
                     if (uid) {
-                        const userProfile = await getUserProfile(uid)
+                        const res = await fetch(`/api/profile/${uid}`)
+                        if (res.ok) {
+                            const userProfile = await res.json()
 
-                        if (userProfile?.onboardingCompleted) {
-                            // Already completed onboarding, redirect to app
-                            if (userProfile.selectedPath === "team") {
-                                router.push("/teams")
-                            } else {
-                                router.push("/desktop")
+                            if (userProfile?.onboardingCompleted) {
+                                // Already completed onboarding, redirect to app
+                                if (userProfile.selectedPath === "team") {
+                                    router.push("/teams")
+                                } else {
+                                    router.push("/desktop")
+                                }
+                                return
                             }
-                            return
                         }
                     }
                 } catch (error) {
