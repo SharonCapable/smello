@@ -7,27 +7,27 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from "@/components/ui/select"
 import { User, Briefcase, ArrowRight, CheckCircle2, Lock, LogIn, Loader2 } from "lucide-react"
 import { signIn } from "next-auth/react"
 
 const PREDEFINED_ROLES = [
-  "Product Manager",
-  "Product Owner",
-  "Founder / CEO",
-  "CTO / Technical Lead",
-  "Designer",
-  "Developer / Engineer",
-  "Business Analyst",
-  "Project Manager",
-  "Consultant",
-  "Student",
-  "Other",
+    "Product Manager",
+    "Product Owner",
+    "Founder / CEO",
+    "CTO / Technical Lead",
+    "Designer",
+    "Developer / Engineer",
+    "Business Analyst",
+    "Project Manager",
+    "Consultant",
+    "Student",
+    "Other",
 ]
 
 interface OnboardingData {
@@ -120,7 +120,7 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack }: Onboardi
                             <div className="space-y-2">
                                 <Label htmlFor="role" className="text-base">What is your role?</Label>
                                 <Select value={data.role} onValueChange={(val) => setData({ ...data, role: val })}>
-                                    <SelectTrigger className="h-12 text-lg">
+                                    <SelectTrigger id="role" className="h-12 text-lg">
                                         <div className="flex items-center gap-2">
                                             <Briefcase className="h-5 w-5 text-muted-foreground" />
                                             <SelectValue placeholder="Select your role" />
