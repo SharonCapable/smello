@@ -94,10 +94,10 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack }: Onboardi
             <Card className="max-w-xl w-full notched-card border shadow-2xl">
                 <CardHeader className="text-center pb-8">
                     <CardTitle className="text-3xl font-bold">
-                        {step === 1 ? "Welcome to SMELLO" : step === 2 ? "Tell Us About Your Product" : step === 3 ? "Choose Your Path" : isAuthenticated ? "Confirm Setup" : "Create Your Account"}
+                        {step === 1 ? "Welcome to SMELLO" : step === 2 ? "What's the problem you're solving?" : step === 3 ? "Choose Your Path" : isAuthenticated ? "Confirm Setup" : "Create Your Account"}
                     </CardTitle>
                     <CardDescription className="text-lg">
-                        {step === 1 ? "Let's get to know you better" : step === 2 ? "Help us tailor Smello for your needs" : step === 3 ? "How do you plan to use Smello?" : isAuthenticated ? "You're almost there!" : "Secure your workspace to continue"}
+                        {step === 1 ? "Let's get to know you better" : step === 2 ? "Tell us the problem or outcome you want to achieve" : step === 3 ? "How do you plan to use Smello?" : isAuthenticated ? "You're almost there!" : "Secure your workspace to continue"}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-8">
@@ -148,10 +148,10 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack }: Onboardi
                     {step === 2 && (
                         <div className="space-y-6 animate-fade-in-up">
                             <div className="space-y-2">
-                                <Label htmlFor="product" className="text-base">What product are you building or managing?</Label>
+                                <Label htmlFor="product" className="text-base">What problem are you trying to solve or what outcome do you want?</Label>
                                 <Input
                                     id="product"
-                                    placeholder="e.g., A mobile app for fitness tracking"
+                                    placeholder="e.g., Reduce customer churn by 20% using personalized onboarding"
                                     className="h-12 text-lg"
                                     value={data.productDescription || ""}
                                     onChange={(e) => setData({ ...data, productDescription: e.target.value })}

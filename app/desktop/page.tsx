@@ -43,6 +43,14 @@ export default function DesktopPage() {
   useEffect(() => {
     // Check if Ollama is available
     const checkOllama = async () => {
+      // Only probe local Ollama when running in a local/dev environment
+      if (typeof window === 'undefined') return
+      const host = window.location.hostname
+      if (host !== 'localhost' && host !== '127.0.0.1') {
+        setOllamaStatus('unavailable')
+        return
+      }
+
       try {
         const response = await fetch('http://localhost:11434/api/tags', {
           signal: AbortSignal.timeout(3000)
