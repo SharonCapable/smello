@@ -94,6 +94,15 @@ export class GlobalUsageCounter {
         return Math.max(0, FREE_TIER_LIMIT - stats.totalOperations)
     }
 
+    // New method to sync with server truth
+    static syncFromServer(serverCount: number, serverLimit: number) {
+        const stats = GlobalUsageCounter.getStats(); // Get current stats
+        stats.totalOperations = serverCount; // Update total operations based on server
+        // We might want to respect server limit too if it's dynamic
+        // GlobalUsageCounter.FREE_TIER_LIMIT = serverLimit; // This would require FREE_TIER_LIMIT to be non-const and part of stats or config
+        GlobalUsageCounter.saveStats(stats); // Save updated stats
+    }
+
     /**
      * Get total operations used in current session
      */

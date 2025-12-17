@@ -31,8 +31,24 @@ export async function GET(_req: Request, { params }: { params: { uid: string } }
 
     const db = admin.firestore()
     const doc = await db.collection('users').doc(uid).get()
-    if (!doc.exists) return NextResponse.json(null)
-    return NextResponse.json(doc.data())
+
+    // Also fetch usage stats to keep UI in sync
+    const statsDoc = await db.collection('usageStats').doc(uid).get()
+    const usageCount = statsDoc.exists ? (statsDoc.data()?.operationCount || 0) : 0
+    const usageLimit = Number(process.env.FREE_AI_OPERATIONS_LIMIT || 6)
+
+    if (!doc.exists) {
+      // Even if user doc doesn't exist, might be useful to return partial info or null?
+      // Existing behavior returns null. Let's keep it null for now or return a basic structure if needed? 
+      // Returning null forces client to handle "no profile". 
+      return NextResponse.json(null)
+    }
+
+    return NextResponse.json({
+      ...doc.data(),
+      usageCount,
+      usageLimit
+    })
   } catch (e: any) {
     console.error('profile api error', e)
     return NextResponse.json({ error: e.message || 'server_error' }, { status: 500 })

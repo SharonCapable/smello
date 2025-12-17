@@ -47,6 +47,29 @@ export function AppHeader() {
                             if (profile) {
                                 if (profile.role) setUserRole(profile.role)
                                 if (profile.name) setUserName(profile.name)
+
+                                // Sync Usage Stats from Server if available
+                                if (typeof profile.usageCount === 'number') {
+                                    // We need to update GlobalUsageCounter to reflect truth
+                                    // This is a bit hacky since GlobalUsageCounter is local-only logic usually.
+                                    // But we can force it or just use state for display.
+                                    // Ideally, GlobalUsageCounter should be refactored to support server sync.
+                                    // For now, let's update the UI state directly here or via a dedicated sync method if existed.
+                                    // Since we can't easily inject into the singleton logic without modifying it, 
+                                    // let's assume GlobalUsageCounter catches up or we rely on this state 
+                                    // for the badge? No, badge uses the singleton.
+                                    // Let's at least update remaining operations state in this component to be accurate
+                                    // even if the sidebar/others might be slightly off until they refresh.
+
+                                    const limit = profile.usageLimit || 6
+                                    const remaining = Math.max(0, limit - profile.usageCount)
+                                    setRemainingOperations(remaining)
+
+                                    // Be explicit: Update the singleton if possible or just rely on this component's state
+                                    // The 'updateStatus' interval overrides this every 5s from GlobalUsageCounter.
+                                    // So we MUST update GlobalUsageCounter's internal state or it will overwrite us.
+                                    GlobalUsageCounter.syncFromServer(profile.usageCount, limit)
+                                }
                             }
                         }
                     }
