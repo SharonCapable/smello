@@ -70,10 +70,15 @@ export async function POST(req: Request, { params }: { params: { uid: string } }
     if (doc.exists) {
       await userRef.update(payload)
     } else {
-      await userRef.set({
+      // Set default onboardingCompleted to false for new users if not provided
+      const newUserData: any = {
         ...payload,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      })
+      }
+      if (newUserData.onboardingCompleted === undefined) {
+        newUserData.onboardingCompleted = false
+      }
+      await userRef.set(newUserData)
     }
 
     return NextResponse.json({ success: true })

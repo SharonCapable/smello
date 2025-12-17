@@ -27,7 +27,6 @@ function AuthSync({ children }: { children: React.ReactNode }) {
                                     name: session.user.name || '',
                                     displayName: session.user.name || '',
                                     photoURL: session.user.image || '',
-                                    onboardingCompleted: false,
                                 }),
                             })
                         } catch (e) {
@@ -42,7 +41,7 @@ function AuthSync({ children }: { children: React.ReactNode }) {
             syncUserProfile()
             // Load server-stored API keys into local storage when user signs in
             try {
-                ApiKeyManager.loadServerKeys().catch(() => {})
+                ApiKeyManager.loadServerKeys().catch(() => { })
             } catch (e) {
                 // ignore
             }
