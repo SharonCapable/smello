@@ -130,9 +130,35 @@ export default function HomePage() {
           }
         }
       } else {
-        // Session exists but no onboarding data.
-        // We used to force onboarding here, but the user prefers to see the Landing Page first.
-        // So we do NOTHING. They will click "Get Started" to trigger onboarding manually.
+        // Session exists but no onboarding data in local storage.
+        // Fetch from server to check if user has already onboarded.
+        const uid = (session.user as any).uid || session.user.email?.replace(/[^a-zA-Z0-9]/g, '_')
+        if (uid) {
+          fetch(`/api/profile/${uid}`)
+            .then(res => res.json())
+            .then(data => {
+              if (data && data.onboardingCompleted) {
+                // Restore local storage
+                localStorage.setItem("smello-user-onboarding", JSON.stringify({
+                  name: data.name || session.user?.name,
+                  role: data.role || "Product Manager",
+                  usageType: data.selectedPath === "team" ? "team" : "personal"
+                }))
+                // Redirect to dashboard
+                if (isTransitionState) {
+                  if (data.selectedPath === "team") {
+                    setAppState("team-dashboard")
+                  } else {
+                    setAppState("workflow-home")
+                  }
+                }
+              } else {
+                // Not onboarded on server either.
+                // Stay on Landing Page (or could force 'onboarding' state if we wanted strict enforcement)
+              }
+            })
+            .catch(e => console.error("Failed to sync profile on home load", e))
+        }
       }
     } else {
       // No session. 
@@ -358,215 +384,215 @@ export default function HomePage() {
         <AppHeader />
 
         <main className="flex-1 container mx-auto px-6 py-8 overflow-x-hidden overflow-y-auto">
-        {/* Workflow Home - Main Dashboard for PMs */}
-        {appState === 'workflow-home' && (
-          <WorkflowHome
-            onStartJourney={handleStartJourney}
-            onQuickAccess={handleQuickAccess}
-            onLoadProject={handleProjectsClick}
-          />
-        )}
-
-        {/* Guided Journey Mode */}
-        {appState === 'guided-journey' && (
-          <div className="space-y-8">
-            <WorkflowStepper
-              currentPhase={workflowPhase}
-              completedPhases={completedPhases}
-              onPhaseClick={handlePhaseClick}
+          {/* Workflow Home - Main Dashboard for PMs */}
+          {appState === 'workflow-home' && (
+            <WorkflowHome
+              onStartJourney={handleStartJourney}
+              onQuickAccess={handleQuickAccess}
+              onLoadProject={handleProjectsClick}
             />
+          )}
 
-            <div className="max-w-4xl mx-auto text-center space-y-4">
-              <h2 className="text-2xl font-bold">
-                Phase {workflowPhase === "ideation" ? "1" : workflowPhase === "foundation" ? "2" : workflowPhase === "strategy" ? "3" : "4"}: {workflowPhase.charAt(0).toUpperCase() + workflowPhase.slice(1)}
-              </h2>
-              <p className="text-muted-foreground">
-                Use the tools below to complete this phase
-              </p>
+          {/* Guided Journey Mode */}
+          {appState === 'guided-journey' && (
+            <div className="space-y-8">
+              <WorkflowStepper
+                currentPhase={workflowPhase}
+                completedPhases={completedPhases}
+                onPhaseClick={handlePhaseClick}
+              />
 
-              <div className="grid md:grid-cols-2 gap-4 mt-8">
-                {getPhaseTools(workflowPhase).map(toolId => (
-                  <Card
-                    key={toolId}
-                    className="cursor-pointer hover:shadow-lg hover:border-accent transition-all animate-fade-in-up"
-                    onClick={() => handleQuickAccess(toolId)}
-                  >
-                    <CardHeader>
-                      <CardTitle className="text-lg">
-                        {toolId.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
-                      </CardTitle>
-                    </CardHeader>
-                  </Card>
-                ))}
+              <div className="max-w-4xl mx-auto text-center space-y-4">
+                <h2 className="text-2xl font-bold">
+                  Phase {workflowPhase === "ideation" ? "1" : workflowPhase === "foundation" ? "2" : workflowPhase === "strategy" ? "3" : "4"}: {workflowPhase.charAt(0).toUpperCase() + workflowPhase.slice(1)}
+                </h2>
+                <p className="text-muted-foreground">
+                  Use the tools below to complete this phase
+                </p>
+
+                <div className="grid md:grid-cols-2 gap-4 mt-8">
+                  {getPhaseTools(workflowPhase).map(toolId => (
+                    <Card
+                      key={toolId}
+                      className="cursor-pointer hover:shadow-lg hover:border-accent transition-all animate-fade-in-up"
+                      onClick={() => handleQuickAccess(toolId)}
+                    >
+                      <CardHeader>
+                        <CardTitle className="text-lg">
+                          {toolId.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                        </CardTitle>
+                      </CardHeader>
+                    </Card>
+                  ))}
+                </div>
+
+                {getNextPhase(workflowPhase) && (
+                  <Button onClick={handleAdvancePhase} className="mt-8">
+                    Complete Phase & Continue →
+                  </Button>
+                )}
               </div>
-
-              {getNextPhase(workflowPhase) && (
-                <Button onClick={handleAdvancePhase} className="mt-8">
-                  Complete Phase & Continue →
-                </Button>
-              )}
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Legacy Home (kept for state compatibility slightly, but likely unreachable via nav now) */}
-        {appState === 'home' && entryMode === null && (
-          <div className="text-center p-8">
-            <Button onClick={() => setAppState("workflow-home")}>Go to Dashboard</Button>
-          </div>
-        )}
+          {/* Legacy Home (kept for state compatibility slightly, but likely unreachable via nav now) */}
+          {appState === 'home' && entryMode === null && (
+            <div className="text-center p-8">
+              <Button onClick={() => setAppState("workflow-home")}>Go to Dashboard</Button>
+            </div>
+          )}
 
-        {/* PDF / Manual Entry Flows */}
-        {appState === 'home' && entryMode === 'pdf' && (
-          <div className="max-w-xl mx-auto text-center mt-24">
-            <h2 className="text-2xl font-semibold mb-4">Preview Extracted Product Information</h2>
-            {pdfParsing && (<div className="mb-4 text-muted-foreground">Parsing PDF, please wait...</div>)}
-            {!pdfParsing && parsedPdfText && !showEditableExtract && (
-              <>
-                <pre className="bg-muted rounded border p-4 text-left overflow-x-auto max-h-80 whitespace-pre-wrap text-xs mb-2">{parsedPdfText.slice(0, 2000)}{parsedPdfText.length > 2000 && '...'}
-                </pre>
-                <div className="flex gap-2 justify-center mt-4">
-                  <Button onClick={() => { setEntryMode(null); setParsedPdfText(null); }} variant="outline">Back</Button>
-                  <Button variant="default" disabled={pdfParsing || !parsedPdfText} onClick={() => setShowEditableExtract(true)}>Continue</Button>
-                </div>
-              </>
-            )}
-            {!pdfParsing && showEditableExtract && (
-              <form onSubmit={e => { e.preventDefault(); setShowEditableExtract(false); setAppState("mode-selection"); }} className="bg-card rounded-lg p-6 border max-w-lg mx-auto flex flex-col gap-4">
-                <div className="text-left">
-                  <label className="block font-semibold mb-1" htmlFor="prodName">Product Name</label>
-                  <input id="prodName" className="bg-background border rounded px-3 py-2 w-full mb-2" value={extractedProductName} onChange={e => setExtractedProductName(e.target.value)} required />
-                </div>
-                <div className="text-left">
-                  <label className="block font-semibold mb-1" htmlFor="prodDesc">Description</label>
-                  <textarea id="prodDesc" className="bg-background border rounded px-3 py-2 w-full min-h-24" value={extractedDescription} onChange={e => setExtractedDescription(e.target.value)} required />
-                </div>
-                <div className="flex gap-2 justify-end">
-                  <Button onClick={() => { setShowEditableExtract(false); }} variant="outline" type="button">Back</Button>
-                  <Button variant="default" type="submit">Confirm & Continue</Button>
-                </div>
-              </form>
-            )}
-            {!pdfParsing && !parsedPdfText && <div className="text-muted-foreground mb-4">No text extracted from PDF.</div>}
-            {fileError && <div className="text-red-600 mt-2 text-xs">{fileError}</div>}
-          </div>
-        )}
+          {/* PDF / Manual Entry Flows */}
+          {appState === 'home' && entryMode === 'pdf' && (
+            <div className="max-w-xl mx-auto text-center mt-24">
+              <h2 className="text-2xl font-semibold mb-4">Preview Extracted Product Information</h2>
+              {pdfParsing && (<div className="mb-4 text-muted-foreground">Parsing PDF, please wait...</div>)}
+              {!pdfParsing && parsedPdfText && !showEditableExtract && (
+                <>
+                  <pre className="bg-muted rounded border p-4 text-left overflow-x-auto max-h-80 whitespace-pre-wrap text-xs mb-2">{parsedPdfText.slice(0, 2000)}{parsedPdfText.length > 2000 && '...'}
+                  </pre>
+                  <div className="flex gap-2 justify-center mt-4">
+                    <Button onClick={() => { setEntryMode(null); setParsedPdfText(null); }} variant="outline">Back</Button>
+                    <Button variant="default" disabled={pdfParsing || !parsedPdfText} onClick={() => setShowEditableExtract(true)}>Continue</Button>
+                  </div>
+                </>
+              )}
+              {!pdfParsing && showEditableExtract && (
+                <form onSubmit={e => { e.preventDefault(); setShowEditableExtract(false); setAppState("mode-selection"); }} className="bg-card rounded-lg p-6 border max-w-lg mx-auto flex flex-col gap-4">
+                  <div className="text-left">
+                    <label className="block font-semibold mb-1" htmlFor="prodName">Product Name</label>
+                    <input id="prodName" className="bg-background border rounded px-3 py-2 w-full mb-2" value={extractedProductName} onChange={e => setExtractedProductName(e.target.value)} required />
+                  </div>
+                  <div className="text-left">
+                    <label className="block font-semibold mb-1" htmlFor="prodDesc">Description</label>
+                    <textarea id="prodDesc" className="bg-background border rounded px-3 py-2 w-full min-h-24" value={extractedDescription} onChange={e => setExtractedDescription(e.target.value)} required />
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button onClick={() => { setShowEditableExtract(false); }} variant="outline" type="button">Back</Button>
+                    <Button variant="default" type="submit">Confirm & Continue</Button>
+                  </div>
+                </form>
+              )}
+              {!pdfParsing && !parsedPdfText && <div className="text-muted-foreground mb-4">No text extracted from PDF.</div>}
+              {fileError && <div className="text-red-600 mt-2 text-xs">{fileError}</div>}
+            </div>
+          )}
 
-        {appState === 'home' && entryMode === 'manual' && (
-          <ManualInputFlow onComplete={handleComplete} onBack={() => setEntryMode(null)} />
-        )}
-        {appState === 'home' && entryMode === 'ai' && (
-          <IdeaGenerator onCreateProject={handleIdeaProjectCreate} onBack={() => setEntryMode(null)} />
-        )}
+          {appState === 'home' && entryMode === 'manual' && (
+            <ManualInputFlow onComplete={handleComplete} onBack={() => setEntryMode(null)} />
+          )}
+          {appState === 'home' && entryMode === 'ai' && (
+            <IdeaGenerator onCreateProject={handleIdeaProjectCreate} onBack={() => setEntryMode(null)} />
+          )}
 
-        {appState === "mode-selection" && <ModeSelector onModeSelect={handleModeSelect} />}
+          {appState === "mode-selection" && <ModeSelector onModeSelect={handleModeSelect} />}
 
-        {appState === "ai-flow" && <AIGenerationFlow onComplete={handleComplete} onBack={handleBack} initialProduct={currentProject?.product} />}
+          {appState === "ai-flow" && <AIGenerationFlow onComplete={handleComplete} onBack={handleBack} initialProduct={currentProject?.product} />}
 
-        {appState === "manual-flow" && <ManualInputFlow onComplete={handleComplete} onBack={handleBack} />}
+          {appState === "manual-flow" && <ManualInputFlow onComplete={handleComplete} onBack={handleBack} />}
 
-        {appState === "project-manager" && (
-          <ProjectManager
-            onCreateNew={handleCreateNew}
-            onLoadProject={handleLoadProject}
-            onModeSelect={handleModeSelect}
-          />
-        )}
+          {appState === "project-manager" && (
+            <ProjectManager
+              onCreateNew={handleCreateNew}
+              onLoadProject={handleLoadProject}
+              onModeSelect={handleModeSelect}
+            />
+          )}
 
-        {appState === "project-view" && currentProject && (
-          <ProjectDetailView
-            project={currentProject}
-            onBack={() => setAppState("project-manager")}
-            onEdit={handleEditProject}
-          />
-        )}
+          {appState === "project-view" && currentProject && (
+            <ProjectDetailView
+              project={currentProject}
+              onBack={() => setAppState("project-manager")}
+              onEdit={handleEditProject}
+            />
+          )}
 
-        {appState === "project-edit" && currentProject && (
-          <ProjectManagementView
-            project={currentProject}
-            onBack={() => setAppState("project-view")}
-            onProjectUpdate={handleProjectUpdate}
-            onNavigateToTool={(tool) => setAppState(tool as AppState)}
-          />
-        )}
+          {appState === "project-edit" && currentProject && (
+            <ProjectManagementView
+              project={currentProject}
+              onBack={() => setAppState("project-view")}
+              onProjectUpdate={handleProjectUpdate}
+              onNavigateToTool={(tool) => setAppState(tool as AppState)}
+            />
+          )}
 
-        {appState === "project-path-selector" && currentProject && (
-          <ProjectPathSelector
-            project={currentProject}
-            onSelectPath={(path) => setAppState(path as AppState)}
-            onBack={() => setAppState("idea-generator")}
-          />
-        )}
+          {appState === "project-path-selector" && currentProject && (
+            <ProjectPathSelector
+              project={currentProject}
+              onSelectPath={(path) => setAppState(path as AppState)}
+              onBack={() => setAppState("idea-generator")}
+            />
+          )}
 
 
-        {appState === "idea-generator" && (
-          <IdeaGenerator onCreateProject={handleIdeaProjectCreate} onBack={handleBack} />
-        )}
+          {appState === "idea-generator" && (
+            <IdeaGenerator onCreateProject={handleIdeaProjectCreate} onBack={handleBack} />
+          )}
 
-        {appState === "feature-prioritization" && (
-          <FeaturePrioritization />
-        )}
+          {appState === "feature-prioritization" && (
+            <FeaturePrioritization />
+          )}
 
-        {appState === "research-agent" && (
-          <ResearchAgent />
-        )}
+          {appState === "research-agent" && (
+            <ResearchAgent />
+          )}
 
-        {appState === "settings" && (
-          <EnhancedApiKeySettings />
-        )}
+          {appState === "settings" && (
+            <EnhancedApiKeySettings />
+          )}
 
-        {appState === "standalone-ai" && (
-          <StandaloneAIGeneration onBack={() => setAppState("workflow-home")} />
-        )}
+          {appState === "standalone-ai" && (
+            <StandaloneAIGeneration onBack={() => setAppState("workflow-home")} />
+          )}
 
-        {appState === "prd-generator" && (
-          <PRDGenerator
-            project={currentProject}
-            onBack={() => setAppState(currentProject ? "project-edit" : "workflow-home")}
-          />
-        )}
+          {appState === "prd-generator" && (
+            <PRDGenerator
+              project={currentProject}
+              onBack={() => setAppState(currentProject ? "project-edit" : "workflow-home")}
+            />
+          )}
 
-        {appState === "technical-blueprint" && (
-          <TechnicalBlueprint
-            project={currentProject}
-            onBack={() => setAppState(currentProject ? "project-edit" : "workflow-home")}
-          />
-        )}
+          {appState === "technical-blueprint" && (
+            <TechnicalBlueprint
+              project={currentProject}
+              onBack={() => setAppState(currentProject ? "project-edit" : "workflow-home")}
+            />
+          )}
 
-        {appState === "pitch-deck-generator" && (
-          <PitchDeckGenerator
-            project={currentProject}
-            onBack={() => setAppState("workflow-home")}
-          />
-        )}
+          {appState === "pitch-deck-generator" && (
+            <PitchDeckGenerator
+              project={currentProject}
+              onBack={() => setAppState("workflow-home")}
+            />
+          )}
 
-        {appState === "user-journey-map" && (
-          <UserJourneyMap
-            project={currentProject}
-            onBack={() => setAppState(currentProject ? "project-edit" : "workflow-home")}
-          />
-        )}
+          {appState === "user-journey-map" && (
+            <UserJourneyMap
+              project={currentProject}
+              onBack={() => setAppState(currentProject ? "project-edit" : "workflow-home")}
+            />
+          )}
 
-        {appState === "competitive-intelligence" && (
-          <CompetitiveIntelligence
-            project={currentProject}
-            onBack={() => setAppState(currentProject ? "project-edit" : "workflow-home")}
-          />
-        )}
+          {appState === "competitive-intelligence" && (
+            <CompetitiveIntelligence
+              project={currentProject}
+              onBack={() => setAppState(currentProject ? "project-edit" : "workflow-home")}
+            />
+          )}
 
-        {appState === "roadmap-builder" && (
-          <RoadmapBuilder
-            project={currentProject}
-            onBack={() => setAppState("workflow-home")}
-          />
-        )}
+          {appState === "roadmap-builder" && (
+            <RoadmapBuilder
+              project={currentProject}
+              onBack={() => setAppState("workflow-home")}
+            />
+          )}
 
-        {appState === "risk-analysis" && (
-          <RiskAnalysis
-            project={currentProject}
-            onBack={() => setAppState("workflow-home")}
-          />
-        )}
+          {appState === "risk-analysis" && (
+            <RiskAnalysis
+              project={currentProject}
+              onBack={() => setAppState("workflow-home")}
+            />
+          )}
         </main>
       </div>
     </div>
