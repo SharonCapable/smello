@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { OnboardingFlow } from "@/components/onboarding-flow"
-import { getUserProfile, createOrUpdateUserProfile } from "@/lib/firestore-service"
+import { getUserProfile } from "@/lib/firestore-service"
 import { Loader2 } from "lucide-react"
 
 interface OnboardingData {
@@ -62,16 +62,19 @@ export default function OnboardingPage() {
             const uid = (session.user as any).uid || session.user.email?.replace(/[^a-zA-Z0-9]/g, '_')
 
             if (uid) {
-                // Update user profile with onboarding data
-                await createOrUpdateUserProfile(uid, {
-                    uid,
-                    email: session.user.email || '',
-                    name: data.name,
-                    displayName: data.name,
-                    photoURL: session.user.image || '',
-                    role: data.role,
-                    selectedPath: data.usageType === "personal" ? "pm" : "team",
-                    onboardingCompleted: true,
+                // Update user profile with onboarding data via server-side API (firebase-admin)
+                await fetch(`/api/profile/${uid}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: session.user.email || '',
+                        name: data.name,
+                        displayName: data.name,
+                        photoURL: session.user.image || '',
+                        role: data.role,
+                        selectedPath: data.usageType === "personal" ? "pm" : "team",
+                        onboardingCompleted: true,
+                    }),
                 })
 
                 // Clear any temporary onboarding data from localStorage
