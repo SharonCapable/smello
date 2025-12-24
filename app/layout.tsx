@@ -2,9 +2,9 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Noto_Sans } from "next/font/google"
 
+import { ClerkProvider } from "@clerk/nextjs"
 import { Suspense } from "react"
 import { ThemeProvider } from "@/components/theme-provider"
-import { AuthProvider } from "@/components/auth-provider"
 import "./globals.css"
 
 const notoSans = Noto_Sans({ subsets: ["latin"], variable: "--font-noto-sans", weight: ["400", "500", "700"] })
@@ -25,9 +25,9 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`font-sans ${notoSans.variable}`}>
-        <AuthProvider>
+    <ClerkProvider>
+      <html lang="en" suppressHydrationWarning>
+        <body className={`font-sans ${notoSans.variable}`}>
           <ThemeProvider
             attribute="class"
             defaultTheme="dark"
@@ -36,8 +36,8 @@ export default function RootLayout({
           >
             <Suspense fallback={null}>{children}</Suspense>
           </ThemeProvider>
-        </AuthProvider>
-      </body>
-    </html>
+        </body>
+      </html>
+    </ClerkProvider>
   )
 }

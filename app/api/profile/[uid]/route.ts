@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import admin from 'firebase-admin'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+import { auth } from '@clerk/nextjs/server'
 
 function initAdmin() {
   if (admin.apps && admin.apps.length) return
@@ -12,9 +11,8 @@ function initAdmin() {
 }
 
 async function getSessionUid() {
-  const session = await getServerSession(authOptions as any)
-  if (!session?.user) return null
-  return (session.user as any).uid || session.user.email?.replace(/[^a-zA-Z0-9]/g, '_')
+  const { userId } = await auth()
+  return userId || null
 }
 
 export async function GET(_req: Request, { params }: { params: { uid: string } }) {

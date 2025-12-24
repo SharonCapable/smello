@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@auth/core": "^0.34.3",
+    "@clerk/nextjs": "^6.36.5",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "latest",
     "@radix-ui/react-alert-dialog": "latest",

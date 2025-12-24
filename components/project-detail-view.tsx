@@ -30,7 +30,8 @@ import {
   Server,
   Cpu,
   Lightbulb,
-  Plus
+  Plus,
+  Search
 } from "lucide-react"
 import { EnhancedExportDialog } from "@/components/enhanced-export-dialog"
 import { JiraIntegration } from "@/components/jira-integration"
@@ -180,99 +181,195 @@ export function ProjectDetailView({ project, onBack, onEdit, onNavigateToTool }:
         </div>
       </div>
 
-      <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="bg-muted/50 p-1">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="prd">PRD & Docs</TabsTrigger>
-          <TabsTrigger value="stories">Epics & Stories</TabsTrigger>
-          <TabsTrigger value="tech">Technical Blueprint</TabsTrigger>
-        </TabsList>
+      <div className="grid md:grid-cols-4 gap-6">
+        {/* Project Sidebar / Navigation */}
+        <div className="md:col-span-1 space-y-4">
+          <Card className="sticky top-24">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Layout className="w-4 h-4 text-accent" />
+                Project Tools
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-2 space-y-1">
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-3 h-10 px-3 hover:bg-accent/10 transition-colors"
+                onClick={() => { }} // Already on dashboard
+              >
+                <FolderOpen className="w-4 h-4 text-accent" />
+                Dashboard
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-3 h-10 px-3 hover:bg-accent/10"
+                onClick={() => onNavigateToTool?.('prd-generator')}
+              >
+                <FileText className="w-4 h-4 text-blue-500" />
+                PRD & Docs
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-3 h-10 px-3 hover:bg-accent/10"
+                onClick={() => onNavigateToTool?.('manual-flow')}
+              >
+                <Target className="w-4 h-4 text-orange-500" />
+                Epics & Stories
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-3 h-10 px-3 hover:bg-accent/10"
+                onClick={() => onNavigateToTool?.('technical-blueprint')}
+              >
+                <Cpu className="w-4 h-4 text-purple-500" />
+                Architecture
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-3 h-10 px-3 hover:bg-accent/10"
+                onClick={() => onNavigateToTool?.('research-agent')}
+              >
+                <Search className="w-4 h-4 text-green-500" />
+                Market Research
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
 
-        {/* TAB 1: OVERVIEW */}
-        <TabsContent value="overview" className="space-y-6 animate-fade-in-up">
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="md:col-span-2 space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Product Vision</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <h4 className="font-semibold mb-1 text-sm text-muted-foreground">Description</h4>
-                    <p>{project.product.description}</p>
+        {/* Main Content Area */}
+        <div className="md:col-span-3 space-y-6">
+          {/* Tool Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Card
+              className="cursor-pointer group hover:border-accent/50 transition-all hover:shadow-md"
+              onClick={() => onNavigateToTool?.('prd-generator')}
+            >
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                    <FileText className="w-5 h-5" />
                   </div>
-                  {project.product.target_audience && (
-                    <div>
-                      <h4 className="font-semibold mb-1 text-sm text-muted-foreground">Target Audience</h4>
-                      <p>{project.product.target_audience}</p>
-                    </div>
+                  {prd ? (
+                    <Badge variant="outline" className="text-green-600 bg-green-50 border-green-200">Generated</Badge>
+                  ) : (
+                    <Badge variant="secondary">Missing</Badge>
                   )}
-                  {project.product.key_features && project.product.key_features.length > 0 && (
-                    <div>
-                      <h4 className="font-semibold mb-1 text-sm text-muted-foreground">Key Features</h4>
-                      <ul className="list-disc pl-5 space-y-1">
-                        {project.product.key_features.map((f, i) => (
-                          <li key={i}>{f}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                </div>
+                <h3 className="font-semibold text-lg mb-1">Product Requirements</h3>
+                <p className="text-sm text-muted-foreground">The full PRD including functional and non-functional specs.</p>
+              </CardContent>
+            </Card>
 
-              {project.generatedIdeas && project.generatedIdeas.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Lightbulb className="w-5 h-5 text-yellow-500" />
-                      Original Idea Candidates
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Accordion type="single" collapsible>
-                      {project.generatedIdeas.map((idea, idx) => (
-                        <AccordionItem key={idx} value={`idea-${idx}`}>
-                          <AccordionTrigger>{idea.title}</AccordionTrigger>
-                          <AccordionContent>
-                            <p className="text-sm text-muted-foreground mb-2">{idea.description}</p>
-                            <div className="flex flex-wrap gap-2">
-                              {idea.keywords?.map((k: string, ki: number) => (
-                                <Badge key={ki} variant="secondary" className="text-xs">{k}</Badge>
-                              ))}
-                            </div>
-                          </AccordionContent>
-                        </AccordionItem>
-                      ))}
-                    </Accordion>
-                  </CardContent>
-                </Card>
+            <Card
+              className="cursor-pointer group hover:border-accent/50 transition-all hover:shadow-md"
+              onClick={() => onNavigateToTool?.('manual-flow')}
+            >
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500 group-hover:bg-orange-500 group-hover:text-white transition-colors">
+                    <Target className="w-5 h-5" />
+                  </div>
+                  <Badge variant="outline" className="text-blue-600 bg-blue-50 border-blue-200">{project.epics.length} Epics</Badge>
+                </div>
+                <h3 className="font-semibold text-lg mb-1">Backlog & Stories</h3>
+                <p className="text-sm text-muted-foreground">Detailed user stories with acceptance criteria and priority.</p>
+              </CardContent>
+            </Card>
+
+            <Card
+              className="cursor-pointer group hover:border-accent/50 transition-all hover:shadow-md"
+              onClick={() => onNavigateToTool?.('technical-blueprint')}
+            >
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-500 group-hover:bg-purple-500 group-hover:text-white transition-colors">
+                    <Cpu className="w-5 h-5" />
+                  </div>
+                  {project.blueprints ? (
+                    <Badge variant="outline" className="text-green-600 bg-green-50 border-green-200">Ready</Badge>
+                  ) : (
+                    <Badge variant="secondary">Incomplete</Badge>
+                  )}
+                </div>
+                <h3 className="font-semibold text-lg mb-1">Architecture Blueprint</h3>
+                <p className="text-sm text-muted-foreground">Technical specs, database schema, and API documentation.</p>
+              </CardContent>
+            </Card>
+
+            <Card
+              className="cursor-pointer group hover:border-accent/50 transition-all hover:shadow-md"
+              onClick={() => onNavigateToTool?.('research-agent')}
+            >
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center text-green-500 group-hover:bg-green-500 group-hover:text-white transition-colors">
+                    <Search className="w-5 h-5" />
+                  </div>
+                  <Badge variant="secondary">Analysis</Badge>
+                </div>
+                <h3 className="font-semibold text-lg mb-1">Market Research</h3>
+                <p className="text-sm text-muted-foreground">Competitor analysis and market insights for your idea.</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Project Vision Card */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle>Product Vision</CardTitle>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={onEdit}>
+                <Edit3 className="w-4 h-4" />
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <h4 className="font-semibold mb-1 text-xs uppercase tracking-wider text-muted-foreground">Description</h4>
+                <p className="text-base leading-relaxed">{project.product.description}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                {project.product.target_audience && (
+                  <div>
+                    <h4 className="font-semibold mb-1 text-xs uppercase tracking-wider text-muted-foreground">Target Audience</h4>
+                    <p className="text-sm">{project.product.target_audience}</p>
+                  </div>
+                )}
+                {project.product.sector && (
+                  <div>
+                    <h4 className="font-semibold mb-1 text-xs uppercase tracking-wider text-muted-foreground">Sector</h4>
+                    <Badge variant="secondary" className="mt-1">{project.product.sector}</Badge>
+                  </div>
+                )}
+              </div>
+              {project.product.key_features && project.product.key_features.length > 0 && (
+                <div>
+                  <h4 className="font-semibold mb-1 text-xs uppercase tracking-wider text-muted-foreground">Key Features</h4>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {project.product.key_features.map((f, i) => (
+                      <Badge key={i} variant="outline" className="bg-accent/5">{f}</Badge>
+                    ))}
+                  </div>
+                </div>
               )}
-            </div>
+            </CardContent>
+          </Card>
 
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Metadata</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {project.product.sector && (
-                    <div>
-                      <span className="text-sm text-muted-foreground block mb-1">Sector</span>
-                      <Badge variant="outline">{project.product.sector}</Badge>
-                    </div>
-                  )}
-                  <div>
-                    <span className="text-sm text-muted-foreground block mb-1">Project ID</span>
-                    <code className="text-xs bg-muted p-1 rounded">{project.id}</code>
-                  </div>
-                </CardContent>
-              </Card>
-
+          {/* Source Document Section */}
+          <Card className="bg-muted/30 border-dashed">
+            <CardContent className="p-6 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded bg-background border flex items-center justify-center">
+                  <FileText className="w-6 h-6 text-muted-foreground" />
+                </div>
+                <div>
+                  <h4 className="font-semibold">{project.documentFileName || "Source Document"}</h4>
+                  <p className="text-xs text-muted-foreground">The original document used to bootstrap this project</p>
+                </div>
+              </div>
               <Dialog>
                 <DialogTrigger asChild>
-                  <Button variant="outline" className="w-full">
+                  <Button variant="outline" size="sm">
                     <Eye className="w-4 h-4 mr-2" />
-                    View Source Document
+                    View Source
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
@@ -286,348 +383,10 @@ export function ProjectDetailView({ project, onBack, onEdit, onNavigateToTool }:
                   />
                 </DialogContent>
               </Dialog>
-            </div>
-          </div>
-        </TabsContent>
-
-        {/* TAB 2: PRD & DOCS */}
-        <TabsContent value="prd" className="space-y-6 animate-fade-in-up">
-          {prd ? (
-            <div className="grid gap-6">
-              <div className="flex justify-end">
-                {onNavigateToTool && (
-                  <Button onClick={() => onNavigateToTool('prd-generator')} variant="outline" size="sm">
-                    <Edit3 className="w-4 h-4 mr-2" />
-                    Add/Update PRD
-                  </Button>
-                )}
-              </div>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Product Requirements Document</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {prd.problemStatement && (
-                    <div>
-                      <h3 className="text-lg font-semibold mb-2">Problem Statement</h3>
-                      <div className="bg-muted/30 p-4 rounded-lg whitespace-pre-wrap">{prd.problemStatement}</div>
-                    </div>
-                  )}
-                  {prd.userStories && (
-                    <div>
-                      <h3 className="text-lg font-semibold mb-2">User Stories (High Level)</h3>
-                      <div className="bg-muted/30 p-4 rounded-lg whitespace-pre-wrap">{prd.userStories}</div>
-                    </div>
-                  )}
-                  {prd.functionalRequirements && (
-                    <div>
-                      <h3 className="text-lg font-semibold mb-2">Functional Requirements</h3>
-                      <div className="bg-muted/30 p-4 rounded-lg whitespace-pre-wrap">{prd.functionalRequirements}</div>
-                    </div>
-                  )}
-                  {prd.nonFunctionalRequirements && (
-                    <div>
-                      <h3 className="text-lg font-semibold mb-2">Non-Functional Requirements</h3>
-                      <div className="bg-muted/30 p-4 rounded-lg whitespace-pre-wrap">{prd.nonFunctionalRequirements}</div>
-                    </div>
-                  )}
-                  {prd.fullDocument && !prd.problemStatement && (
-                    <div>
-                      <div className="bg-muted/30 p-4 rounded-lg whitespace-pre-wrap">{prd.fullDocument}</div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          ) : (
-            <Card className="text-center py-12">
-              <CardContent className="space-y-4">
-                <FileText className="w-12 h-12 mx-auto text-muted-foreground" />
-                <div>
-                  <h3 className="text-xl font-semibold">No PRD Generated Yet</h3>
-                  <p className="text-muted-foreground max-w-md mx-auto">
-                    Generate a comprehensive Product Requirements Document using our AI tool to structure your product vision.
-                  </p>
-                </div>
-                {onNavigateToTool && (
-                  <Button onClick={() => onNavigateToTool('prd-generator')}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Generate PRD
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
-        {/* TAB 3: EPICS & STORIES */}
-        <TabsContent value="stories" className="space-y-6 animate-fade-in-up">
-          <div className="flex justify-end gap-2 mb-4">
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button variant="outline">
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Jira Integration
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Jira Integration</DialogTitle>
-                  <DialogDescription>
-                    Connect your project to Jira for seamless workflow management
-                  </DialogDescription>
-                </DialogHeader>
-                <JiraIntegration project={project} />
-              </DialogContent>
-            </Dialog>
-          </div>
-          {project.epics.length === 0 ? (
-            <Card className="text-center py-12">
-              <CardContent className="space-y-4">
-                <Target className="w-12 h-12 mx-auto text-muted-foreground" />
-                <div>
-                  <h3 className="text-xl font-semibold">No Epics or Stories</h3>
-                  <p className="text-muted-foreground">
-                    Start breaking down your product into Epics and User Stories.
-                  </p>
-                </div>
-                {onNavigateToTool && (
-                  <div className="flex gap-2 justify-center">
-                    <Button onClick={() => onNavigateToTool('manual-flow')}>Add Manually</Button>
-                    <Button variant="secondary" onClick={() => onNavigateToTool('ai-flow')}>Generate with AI</Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-6">
-              {project.epics.map((epic) => (
-                <Card key={epic.id} className="bg-card border-border">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="text-xl flex items-center gap-2">
-                          <Target className="w-5 h-5 text-accent" />
-                          {epic.title}
-                        </CardTitle>
-                        <CardDescription className="mt-1">
-                          Epic ID: {epic.id} • {epic.user_stories.length} user stories
-                        </CardDescription>
-                      </div>
-                      <Badge variant="outline">{epic.user_stories.length} stories</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <Accordion type="single" collapsible value={expandedEpic} onValueChange={setExpandedEpic}>
-                      {epic.user_stories.map((story, index) => (
-                        <AccordionItem key={story.id} value={`${epic.id}-${story.id}`} className="border-border">
-                          <AccordionTrigger className="hover:no-underline">
-                            <div className="flex items-center justify-between w-full mr-4">
-                              <div className="flex items-center gap-3">
-                                <Badge variant="outline" className="text-xs">
-                                  {story.id}
-                                </Badge>
-                                <span className="text-left font-medium">{story.title || story.description.substring(0, 60) + "..."}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {story.status && (
-                                  <Badge className={getStatusColor(story.status)}>
-                                    {story.status}
-                                  </Badge>
-                                )}
-                                {story.jira_key && (
-                                  <Badge variant="outline" className="text-xs">
-                                    {story.jira_key}
-                                  </Badge>
-                                )}
-                                {story.optional_fields?.priority && (
-                                  <Badge className={getPriorityColor(story.optional_fields.priority)}>
-                                    {story.optional_fields.priority}
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                          </AccordionTrigger>
-                          <AccordionContent className="pt-4">
-                            <div className="space-y-6">
-                              {/* Description */}
-                              <div>
-                                <h4 className="font-semibold text-foreground mb-2 flex items-center gap-2">
-                                  <FileText className="w-4 h-4" />
-                                  Description
-                                </h4>
-                                <p className="text-muted-foreground bg-muted/30 p-3 rounded-lg">{story.description}</p>
-                              </div>
-
-                              {/* Acceptance Criteria */}
-                              {story.acceptance_criteria.length > 0 && (
-                                <div>
-                                  <h4 className="font-semibold text-foreground mb-2 flex items-center gap-2">
-                                    <CheckCircle className="w-4 h-4 text-green-500" />
-                                    Acceptance Criteria
-                                  </h4>
-                                  <ul className="space-y-2">
-                                    {story.acceptance_criteria.map((criteria, idx) => (
-                                      <li key={idx} className="flex items-start gap-2 text-sm">
-                                        <CheckCircle className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
-                                        <span>{criteria}</span>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              )}
-
-                              {/* Validations */}
-                              {story.validations.length > 0 && (
-                                <div>
-                                  <h4 className="font-semibold text-foreground mb-2 flex items-center gap-2">
-                                    <Target className="w-4 h-4 text-blue-500" />
-                                    Validations
-                                  </h4>
-                                  <ul className="space-y-2">
-                                    {story.validations.map((validation, idx) => (
-                                      <li key={idx} className="flex items-start gap-2 text-sm">
-                                        <Target className="w-3 h-3 text-blue-500 mt-0.5 flex-shrink-0" />
-                                        <span>{validation}</span>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              )}
-
-                              {/* Edge Cases */}
-                              {story.edge_cases.length > 0 && (
-                                <div>
-                                  <h4 className="font-semibold text-foreground mb-2 flex items-center gap-2">
-                                    <AlertTriangle className="w-4 h-4 text-orange-500" />
-                                    Edge Cases
-                                  </h4>
-                                  <ul className="space-y-2">
-                                    {story.edge_cases.map((edge, idx) => (
-                                      <li key={idx} className="flex items-start gap-2 text-sm">
-                                        <AlertTriangle className="w-3 h-3 text-orange-500 mt-0.5 flex-shrink-0" />
-                                        <span>{edge}</span>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              )}
-
-                              {/* Optional Fields */}
-                              {story.optional_fields && (
-                                <div className="bg-muted/30 p-4 rounded-lg">
-                                  <h4 className="font-semibold text-foreground mb-3">Additional Details</h4>
-                                  <div className="grid md:grid-cols-2 gap-4 text-sm">
-                                    {story.optional_fields.priority && (
-                                      <div>
-                                        <span className="font-medium">Priority:</span>
-                                        <Badge className={`ml-2 ${getPriorityColor(story.optional_fields.priority)}`}>
-                                          {story.optional_fields.priority}
-                                        </Badge>
-                                      </div>
-                                    )}
-                                    {story.optional_fields.effort_estimate && (
-                                      <div>
-                                        <span className="font-medium">Effort Estimate:</span>
-                                        <span className="ml-2 text-muted-foreground">
-                                          {story.optional_fields.effort_estimate}
-                                        </span>
-                                      </div>
-                                    )}
-                                    {story.optional_fields.risk_notes && (
-                                      <div className="md:col-span-2">
-                                        <span className="font-medium">Risk Notes:</span>
-                                        <p className="mt-1 text-muted-foreground">{story.optional_fields.risk_notes}</p>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </AccordionContent>
-                        </AccordionItem>
-                      ))}
-                    </Accordion>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        {/* TAB 4: TECHNICAL BLUEPRINT */}
-        <TabsContent value="tech" className="space-y-6 animate-fade-in-up">
-          {project.blueprints ? (
-            <div className="grid gap-6">
-              <div className="flex justify-end">
-                {onNavigateToTool && (
-                  <Button onClick={() => onNavigateToTool('technical-blueprint')} variant="outline" size="sm">
-                    <Edit3 className="w-4 h-4 mr-2" />
-                    Update Blueprint
-                  </Button>
-                )}
-              </div>
-              {project.blueprints.architecture && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Layout className="w-5 h-5 text-accent" />
-                      System Architecture
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="bg-muted/30 p-4 rounded-lg whitespace-pre-wrap">{project.blueprints.architecture}</div>
-                  </CardContent>
-                </Card>
-              )}
-              {project.blueprints.database && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Database className="w-5 h-5 text-accent" />
-                      Database Schema
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="bg-muted/30 p-4 rounded-lg whitespace-pre-wrap">{project.blueprints.database}</div>
-                  </CardContent>
-                </Card>
-              )}
-              {project.blueprints.api && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Server className="w-5 h-5 text-accent" />
-                      API Specifications
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="bg-muted/30 p-4 rounded-lg whitespace-pre-wrap">{project.blueprints.api}</div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          ) : (
-            <Card className="text-center py-12">
-              <CardContent className="space-y-4">
-                <Cpu className="w-12 h-12 mx-auto text-muted-foreground" />
-                <div>
-                  <h3 className="text-xl font-semibold">No Technical Blueprint</h3>
-                  <p className="text-muted-foreground max-w-md mx-auto">
-                    Generate system architecture, database schema, and API specs for this project.
-                  </p>
-                </div>
-                {onNavigateToTool && (
-                  <Button onClick={() => onNavigateToTool('technical-blueprint')}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Generate Blueprint
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-      </Tabs>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   )
 }

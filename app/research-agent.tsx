@@ -10,9 +10,10 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Search, FileText, Send, History, Loader2, AlertCircle, CheckCircle, Download, ChevronDown, Info, BookOpen } from 'lucide-react';
+import { Search, FileText, Send, History, Loader2, AlertCircle, CheckCircle, Download, ChevronDown, Info, BookOpen, ArrowLeft } from 'lucide-react';
 import { GlobalUsageCounter } from "@/lib/global-usage-counter"
 import jsPDF from "jspdf"
+import type { StoredProject } from "@/lib/storage"
 
 interface ResearchQuery {
   id: string;
@@ -23,10 +24,15 @@ interface ResearchQuery {
   sentTo?: 'slack' | 'email' | null;
 }
 
+interface ResearchAgentProps {
+  project?: StoredProject | null;
+  onBack?: () => void;
+}
+
 const STORAGE_KEY = 'smello-research-history';
 
-export default function ResearchAgent() {
-  const [query, setQuery] = useState('');
+export default function ResearchAgent({ project, onBack }: ResearchAgentProps) {
+  const [query, setQuery] = useState(project ? `Research market opportunities for ${project.name}: ${project.product.description}` : '');
   const [frameworkSource, setFrameworkSource] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentResult, setCurrentResult] = useState<string | null>(null);
@@ -83,12 +89,19 @@ export default function ResearchAgent() {
         }),
       });
 
+      if (response.status === 404) {
+        throw new Error('Research Agent service is currently offline (404). This usually happens if the backend server (e.g. Railway) has reached its limits or is down.');
+      }
+
       const data = await response.json();
 
       if (!data.success) {
         let errorMessage = data.error || 'Research agent failed';
         if (errorMessage.includes('Exit code') || errorMessage.includes('failed to execute')) {
           errorMessage = 'Research Agent failed to run. Please check if the Python environment is set up correctly in "C:\\Users\\Sharon\\Videos\\Wizzle\\Automations\\adhoc-research".';
+        }
+        if (errorMessage.toLowerCase().includes('not found') || response.status === 404) {
+          errorMessage = 'Research Agent service not found (404). The hosting service might be offline.';
         }
         throw new Error(errorMessage);
       }
@@ -265,7 +278,13 @@ ${query.result || 'No findings available.'}
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-8 mt-6 space-y-8">
+    <div className="w-full h-full p-6 space-y-6">
+      {onBack && (
+        <Button variant="ghost" className="gap-2 -ml-4 mb-2 hover:bg-accent/10" onClick={onBack}>
+          <ArrowLeft className="w-4 h-4" />
+          Back to Project
+        </Button>
+      )}
       <Card className="notched-card border shadow-xl">
         <CardHeader>
           <CardTitle className="text-2xl font-bold flex items-center gap-2">

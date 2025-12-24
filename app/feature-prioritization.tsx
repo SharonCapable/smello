@@ -9,61 +9,61 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Textarea } from '@/components/ui/textarea';
-import { ChevronDown, ChevronUp, Plus, Trash2, Info, ArrowRight } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Trash2, Info, ArrowRight, ArrowLeft } from 'lucide-react';
 import { FeatureIntegrationModal } from '@/components/feature-integration-modal';
 
 // Google Sheet Formula Implementation
 const VALUE_METRICS = [
-  { 
-    key: 'userValue', 
+  {
+    key: 'userValue',
     label: 'User Value',
     description: 'How much value does this feature provide to end users? (1-5 scale)'
   },
-  { 
-    key: 'strategicFit', 
+  {
+    key: 'strategicFit',
     label: 'Strategic Fit',
     description: 'How well does this align with our business strategy and goals? (1-5 scale)'
   },
-  { 
-    key: 'customerDemand', 
+  {
+    key: 'customerDemand',
     label: 'Customer Demand',
     description: 'How much demand exists from customers for this feature? (1-5 scale)'
   },
-  { 
-    key: 'timeToValue', 
+  {
+    key: 'timeToValue',
     label: 'Time to Value',
     description: 'How quickly will users see value after implementation? (1-5 scale, 5=fast)'
   },
-  { 
-    key: 'competitorGap', 
+  {
+    key: 'competitorGap',
     label: 'Competitor Gap',
     description: 'How much does this give us an advantage over competitors? (1-5 scale)'
   },
-  { 
-    key: 'userTypeImpact', 
+  {
+    key: 'userTypeImpact',
     label: 'User Type Impact',
     description: 'How many user types will this feature benefit? (1-5 scale)'
   },
 ];
 
 const EFFORT_METRICS = [
-  { 
-    key: 'devEffort', 
+  {
+    key: 'devEffort',
     label: 'Dev Effort',
     description: 'How much development effort is required? (1-5 scale, 5=high effort)'
   },
-  { 
-    key: 'techRisk', 
+  {
+    key: 'techRisk',
     label: 'Tech Risk',
     description: 'What is the technical risk or complexity? (1-5 scale, 5=high risk)'
   },
-  { 
-    key: 'crossFeatureDependency', 
+  {
+    key: 'crossFeatureDependency',
     label: 'Cross-Feature Dependency',
     description: 'How many other features does this depend on? (1-5 scale)'
   },
-  { 
-    key: 'maintenanceCost', 
+  {
+    key: 'maintenanceCost',
     label: 'Maintenance Cost',
     description: 'What is the ongoing maintenance cost? (1-5 scale, 5=high cost)'
   },
@@ -75,7 +75,7 @@ function calculateTotalValueScore(feature: Feature): number {
     const val = parseFloat(feature.scores[m.key] || '0');
     return isNaN(val) ? null : val;
   }).filter(v => v !== null) as number[];
-  
+
   if (values.length === 0) return 0;
   return values.reduce((sum, v) => sum + v, 0) / values.length;
 }
@@ -86,7 +86,7 @@ function calculateTotalEffortScore(feature: Feature): number {
     const val = parseFloat(feature.scores[m.key] || '0');
     return isNaN(val) ? null : val;
   }).filter(v => v !== null) as number[];
-  
+
   if (values.length === 0) return 0;
   return values.reduce((sum, v) => sum + v, 0) / values.length;
 }
@@ -95,10 +95,10 @@ function calculateTotalEffortScore(feature: Feature): number {
 function calculatePriorityScore(feature: Feature): number | string {
   const totalValue = calculateTotalValueScore(feature);
   const totalEffort = calculateTotalEffortScore(feature);
-  
+
   if (totalValue === 0 || totalEffort === 0) return 'Fill in scores';
   if (!isFinite(totalValue) || !isFinite(totalEffort)) return 'Invalid scores';
-  
+
   return totalValue / totalEffort;
 }
 
@@ -106,7 +106,7 @@ function calculatePriorityScore(feature: Feature): number | string {
 function getAction(priorityScore: number | string): string {
   if (typeof priorityScore === 'string') return priorityScore;
   if (!isFinite(priorityScore)) return 'Fill in Priority Score';
-  
+
   if (priorityScore < 1) return '❌ Drop';
   if (priorityScore < 2) return '🔍 Investigate';
   if (priorityScore < 3) return '🤷‍♂️ Backlog';
@@ -130,7 +130,11 @@ interface Feature {
   notes: string;
 }
 
-export default function FeaturePrioritization() {
+interface FeaturePrioritizationProps {
+  onBack?: () => void;
+}
+
+export default function FeaturePrioritization({ onBack }: FeaturePrioritizationProps) {
   const [features, setFeatures] = useState<Feature[]>([
     { id: 1, name: '', description: '', source: '', scores: {}, notes: '' },
   ]);
@@ -181,7 +185,13 @@ export default function FeaturePrioritization() {
   });
 
   return (
-    <div className="max-w-5xl mx-auto p-8 mt-6 space-y-8">
+    <div className="w-full h-full p-6 space-y-6">
+      {onBack && (
+        <Button variant="ghost" className="gap-2 -ml-4 mb-2 hover:bg-accent/10" onClick={onBack}>
+          <ArrowLeft className="w-4 h-4" />
+          Back to Project
+        </Button>
+      )}
       <Card className="notched-card border shadow-xl">
         <CardHeader>
           <CardTitle className="text-2xl font-bold flex items-center gap-2">
@@ -205,7 +215,7 @@ export default function FeaturePrioritization() {
                 <div>
                   <h4 className="font-semibold mb-2">📊 How It Works</h4>
                   <p className="text-sm text-muted-foreground">
-                    This framework calculates a Priority Score by dividing the Total Value Score by the Total Effort Score. 
+                    This framework calculates a Priority Score by dividing the Total Value Score by the Total Effort Score.
                     Higher scores indicate features that deliver more value relative to the effort required.
                   </p>
                 </div>
@@ -248,137 +258,137 @@ export default function FeaturePrioritization() {
               </div>
             </CollapsibleContent>
           </Collapsible>
-          
+
           <div className="overflow-x-auto">
             <div className="max-w-full">
               <table className="min-w-full border text-xs relative z-10">
-              <thead className="bg-muted font-semibold sticky top-0">
-                <tr>
-                  <th className="py-2 px-2 border text-center">Index</th>
-                  <th className="py-2 px-2 border min-w-[120px]">Source of Feature</th>
-                  <th className="py-2 px-2 border min-w-[180px]">Feature</th>
-                  <th className="py-2 px-2 border text-center min-w-[100px]">Action</th>
-                  <th className="py-2 px-2 border text-center min-w-[80px]">Priority Score</th>
-                  <th className="py-2 px-2 border text-center min-w-[80px]">Total Value Score</th>
-                  <th className="py-2 px-2 border text-center min-w-[80px]">Total Effort Score</th>
-                  <th colSpan={VALUE_METRICS.length} className="py-2 px-2 border text-center bg-blue-50 dark:bg-blue-950/20">Value Metrics</th>
-                  <th colSpan={EFFORT_METRICS.length} className="py-2 px-2 border text-center bg-orange-50 dark:bg-orange-950/20">Effort Metrics</th>
-                  <th className="py-2 px-2 border"></th>
-                </tr>
-                <tr>
-                  <th colSpan={7}></th>
-                  {VALUE_METRICS.map(m => (
-                    <th key={m.key} className="py-1 px-1 border text-center bg-blue-50 dark:bg-blue-950/20 text-[10px]">{m.label}</th>
-                  ))}
-                  {EFFORT_METRICS.map(m => (
-                    <th key={m.key} className="py-1 px-1 border text-center bg-orange-50 dark:bg-orange-950/20 text-[10px]">{m.label}</th>
-                  ))}
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedFeatures.map((feature, index) => {
-                  const totalValue = calculateTotalValueScore(feature);
-                  const totalEffort = calculateTotalEffortScore(feature);
-                  const priorityScore = calculatePriorityScore(feature);
-                  const action = getAction(priorityScore);
-                  
-                  return (
-                    <tr key={feature.id} className="hover:bg-accent/5 transition">
-                      <td className="border px-2 py-2 text-center font-mono text-xs">{index + 1}</td>
-                      <td className="border px-2 py-2">
-                        <Input
-                          placeholder="Sheet, interview..."
-                          value={feature.source}
-                          onChange={e => updateFeature(feature.id, { source: e.target.value })}
-                          className="w-full text-xs h-8"
-                        />
-                      </td>
-                      <td className="border px-2 py-2">
-                        <Input
-                          placeholder="Feature title"
-                          value={feature.name}
-                          onChange={e => updateFeature(feature.id, { name: e.target.value })}
-                          className="w-full text-xs mb-1"
-                        />
-                        <Input
-                          placeholder="Description"
-                          value={feature.description}
-                          onChange={e => updateFeature(feature.id, { description: e.target.value })}
-                          className="w-full text-[10px] bg-muted h-6"
-                        />
-                      </td>
-                      <td className="border px-2 py-2 text-center font-semibold">
-                        <span className="text-xs">{action}</span>
-                      </td>
-                      <td className="border px-2 py-2 text-center font-bold">
-                        {typeof priorityScore === 'number' ? priorityScore.toFixed(2) : <span className="text-xs text-muted-foreground">{priorityScore}</span>}
-                      </td>
-                      <td className="border px-2 py-2 text-center font-semibold text-blue-600 dark:text-blue-400">
-                        {totalValue > 0 ? totalValue.toFixed(2) : '-'}
-                      </td>
-                      <td className="border px-2 py-2 text-center font-semibold text-orange-600 dark:text-orange-400">
-                        {totalEffort > 0 ? totalEffort.toFixed(2) : '-'}
-                      </td>
-                      {VALUE_METRICS.map(m => (
-                        <td key={m.key} className="border px-1 py-1 bg-blue-50/50 dark:bg-blue-950/10">
+                <thead className="bg-muted font-semibold sticky top-0">
+                  <tr>
+                    <th className="py-2 px-2 border text-center">Index</th>
+                    <th className="py-2 px-2 border min-w-[120px]">Source of Feature</th>
+                    <th className="py-2 px-2 border min-w-[180px]">Feature</th>
+                    <th className="py-2 px-2 border text-center min-w-[100px]">Action</th>
+                    <th className="py-2 px-2 border text-center min-w-[80px]">Priority Score</th>
+                    <th className="py-2 px-2 border text-center min-w-[80px]">Total Value Score</th>
+                    <th className="py-2 px-2 border text-center min-w-[80px]">Total Effort Score</th>
+                    <th colSpan={VALUE_METRICS.length} className="py-2 px-2 border text-center bg-blue-50 dark:bg-blue-950/20">Value Metrics</th>
+                    <th colSpan={EFFORT_METRICS.length} className="py-2 px-2 border text-center bg-orange-50 dark:bg-orange-950/20">Effort Metrics</th>
+                    <th className="py-2 px-2 border"></th>
+                  </tr>
+                  <tr>
+                    <th colSpan={7}></th>
+                    {VALUE_METRICS.map(m => (
+                      <th key={m.key} className="py-1 px-1 border text-center bg-blue-50 dark:bg-blue-950/20 text-[10px]">{m.label}</th>
+                    ))}
+                    {EFFORT_METRICS.map(m => (
+                      <th key={m.key} className="py-1 px-1 border text-center bg-orange-50 dark:bg-orange-950/20 text-[10px]">{m.label}</th>
+                    ))}
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedFeatures.map((feature, index) => {
+                    const totalValue = calculateTotalValueScore(feature);
+                    const totalEffort = calculateTotalEffortScore(feature);
+                    const priorityScore = calculatePriorityScore(feature);
+                    const action = getAction(priorityScore);
+
+                    return (
+                      <tr key={feature.id} className="hover:bg-accent/5 transition">
+                        <td className="border px-2 py-2 text-center font-mono text-xs">{index + 1}</td>
+                        <td className="border px-2 py-2">
                           <Input
-                            type="number"
-                            min={1} max={5}
-                            step={1}
-                            value={feature.scores[m.key] || ''}
-                            onChange={e => updateFeature(feature.id, { scores: { ...feature.scores, [m.key]: e.target.value } })}
-                            className="w-14 text-center text-xs h-7"
-                            placeholder="1-5"
+                            placeholder="Sheet, interview..."
+                            value={feature.source}
+                            onChange={e => updateFeature(feature.id, { source: e.target.value })}
+                            className="w-full text-xs h-8"
                           />
                         </td>
-                      ))}
-                      {EFFORT_METRICS.map(m => (
-                        <td key={m.key} className="border px-1 py-1 bg-orange-50/50 dark:bg-orange-950/10">
+                        <td className="border px-2 py-2">
                           <Input
-                            type="number"
-                            min={1} max={5}
-                            step={1}
-                            value={feature.scores[m.key] || ''}
-                            onChange={e => updateFeature(feature.id, { scores: { ...feature.scores, [m.key]: e.target.value } })}
-                            className="w-14 text-center text-xs h-7"
-                            placeholder="1-5"
+                            placeholder="Feature title"
+                            value={feature.name}
+                            onChange={e => updateFeature(feature.id, { name: e.target.value })}
+                            className="w-full text-xs mb-1"
+                          />
+                          <Input
+                            placeholder="Description"
+                            value={feature.description}
+                            onChange={e => updateFeature(feature.id, { description: e.target.value })}
+                            className="w-full text-[10px] bg-muted h-6"
                           />
                         </td>
-                      ))}
-                      <td className="border px-2 py-2">
-                        <div className="flex gap-1">
-                          <Button 
-                            onClick={() => removeFeature(feature.id)} 
-                            variant="destructive" 
-                            size="sm" 
-                            type="button" 
-                            className="h-7 text-xs"
-                          >
-                            Remove
-                          </Button>
-                          {feature.name && typeof priorityScore === 'number' && priorityScore >= 3 && (
-                            <Button 
-                              onClick={() => {
-                                setSelectedFeature(feature);
-                                setIntegrationModalOpen(true);
-                              }}
-                              variant="default" 
-                              size="sm" 
-                              type="button" 
-                              className="h-7 text-xs bg-green-600 hover:bg-green-700"
-                              title="Add to project as epic/user story"
+                        <td className="border px-2 py-2 text-center font-semibold">
+                          <span className="text-xs">{action}</span>
+                        </td>
+                        <td className="border px-2 py-2 text-center font-bold">
+                          {typeof priorityScore === 'number' ? priorityScore.toFixed(2) : <span className="text-xs text-muted-foreground">{priorityScore}</span>}
+                        </td>
+                        <td className="border px-2 py-2 text-center font-semibold text-blue-600 dark:text-blue-400">
+                          {totalValue > 0 ? totalValue.toFixed(2) : '-'}
+                        </td>
+                        <td className="border px-2 py-2 text-center font-semibold text-orange-600 dark:text-orange-400">
+                          {totalEffort > 0 ? totalEffort.toFixed(2) : '-'}
+                        </td>
+                        {VALUE_METRICS.map(m => (
+                          <td key={m.key} className="border px-1 py-1 bg-blue-50/50 dark:bg-blue-950/10">
+                            <Input
+                              type="number"
+                              min={1} max={5}
+                              step={1}
+                              value={feature.scores[m.key] || ''}
+                              onChange={e => updateFeature(feature.id, { scores: { ...feature.scores, [m.key]: e.target.value } })}
+                              className="w-14 text-center text-xs h-7"
+                              placeholder="1-5"
+                            />
+                          </td>
+                        ))}
+                        {EFFORT_METRICS.map(m => (
+                          <td key={m.key} className="border px-1 py-1 bg-orange-50/50 dark:bg-orange-950/10">
+                            <Input
+                              type="number"
+                              min={1} max={5}
+                              step={1}
+                              value={feature.scores[m.key] || ''}
+                              onChange={e => updateFeature(feature.id, { scores: { ...feature.scores, [m.key]: e.target.value } })}
+                              className="w-14 text-center text-xs h-7"
+                              placeholder="1-5"
+                            />
+                          </td>
+                        ))}
+                        <td className="border px-2 py-2">
+                          <div className="flex gap-1">
+                            <Button
+                              onClick={() => removeFeature(feature.id)}
+                              variant="destructive"
+                              size="sm"
+                              type="button"
+                              className="h-7 text-xs"
                             >
-                              <ArrowRight className="w-3 h-3" />
+                              Remove
                             </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                            {feature.name && typeof priorityScore === 'number' && priorityScore >= 3 && (
+                              <Button
+                                onClick={() => {
+                                  setSelectedFeature(feature);
+                                  setIntegrationModalOpen(true);
+                                }}
+                                variant="default"
+                                size="sm"
+                                type="button"
+                                className="h-7 text-xs bg-green-600 hover:bg-green-700"
+                                title="Add to project as epic/user story"
+                              >
+                                <ArrowRight className="w-3 h-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
           <div className="flex mt-4 gap-2">
@@ -386,7 +396,7 @@ export default function FeaturePrioritization() {
           </div>
         </CardContent>
       </Card>
-      
+
       <FeatureIntegrationModal
         isOpen={integrationModalOpen}
         onClose={() => {
@@ -396,8 +406,8 @@ export default function FeaturePrioritization() {
         feature={selectedFeature ? {
           name: selectedFeature.name,
           description: selectedFeature.description,
-          priorityScore: typeof calculatePriorityScore(selectedFeature) === 'number' 
-            ? calculatePriorityScore(selectedFeature) as number 
+          priorityScore: typeof calculatePriorityScore(selectedFeature) === 'number'
+            ? calculatePriorityScore(selectedFeature) as number
             : 0,
           action: getAction(calculatePriorityScore(selectedFeature)),
           source: selectedFeature.source

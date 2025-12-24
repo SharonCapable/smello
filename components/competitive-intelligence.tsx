@@ -103,7 +103,7 @@ export function CompetitiveIntelligence({ project, onBack }: CompetitiveIntellig
     }
 
     return (
-        <div className="max-w-5xl mx-auto space-y-8">
+        <div className="w-full h-full p-6 space-y-6">
             <ApiKeySetup
                 isOpen={showApiKeySetup}
                 onApiKeySet={() => setShowApiKeySetup(false)}

@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ApiKeyManager } from '@/lib/api-key-manager'
 import { ApiKeySetup } from '@/components/api-key-setup'
 import { useToast } from '@/hooks/use-toast'
-import { useSession } from 'next-auth/react'
+import { useUser } from '@clerk/nextjs'
 
 function maskKey(k?: string) {
   if (!k) return 'Not set'
@@ -15,7 +15,7 @@ function maskKey(k?: string) {
 }
 
 export default function KeysSettingsPage() {
-  const { data: session, status } = useSession()
+  const { user, isLoaded, isSignedIn } = useUser()
   const [keys, setKeys] = useState<{ geminiKey?: string; claudeKey?: string } | null>(null)
   const [loading, setLoading] = useState(false)
   const [showSetup, setShowSetup] = useState(false)
@@ -23,6 +23,7 @@ export default function KeysSettingsPage() {
   const { toast } = useToast()
 
   async function load() {
+    if (!isLoaded) return
     setLoading(true)
     try {
       // try server-side keys first
@@ -44,7 +45,7 @@ export default function KeysSettingsPage() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [status])
+  useEffect(() => { load() }, [isLoaded, isSignedIn])
 
   const handleRemove = async () => {
     if (!confirm('Remove stored API keys from your account?')) return
@@ -92,7 +93,7 @@ export default function KeysSettingsPage() {
           <div className="flex gap-2">
             <Button onClick={load} disabled={loading}>Refresh</Button>
             <Button onClick={handleUpdate} disabled={loading}>Update</Button>
-            <Button variant="destructive" onClick={handleRemove} disabled={loading || status !== 'authenticated'}>
+            <Button variant="destructive" onClick={handleRemove} disabled={loading || !isSignedIn}>
               Remove from account
             </Button>
           </div>

@@ -1,6 +1,5 @@
 "use client"
 
-import { useSession, signIn, signOut } from "next-auth/react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
@@ -14,12 +13,14 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { LogIn, LogOut, User, Settings, Sparkles, Zap, Brain, Briefcase } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { useUser, useClerk } from "@clerk/nextjs"
 import { GlobalUsageCounter } from "@/lib/global-usage-counter"
 import { useRouter } from 'next/navigation'
 import { setUserId } from "@/lib/storage-hybrid"
 
 export function UserProfile() {
-    const { data: session, status } = useSession()
+    const { user, isLoaded, isSignedIn } = useUser()
+    const { signOut, openSignIn } = useClerk()
     const [mounted, setMounted] = useState(false)
     const [remainingOperations, setRemainingOperations] = useState(0)
     const [activeProvider, setActiveProvider] = useState<string | null>(null)
@@ -33,9 +34,9 @@ export function UserProfile() {
 
         // Load user profile from Firestore
         const loadUserProfile = async () => {
-            if (session?.user) {
+            if (isLoaded && isSignedIn && user) {
                 try {
-                    const uid = (session.user as any).uid || session.user.email?.replace(/[^a-zA-Z0-9]/g, '_')
+                    const uid = user.id
                     if (uid) {
                         // Set user ID for hybrid storage
                         setUserId(uid)
@@ -49,6 +50,12 @@ export function UserProfile() {
                                 if (profile) {
                                     if (profile.role) setUserRole(profile.role)
                                     if (profile.name) setUserName(profile.name)
+
+                                    // Sync usage from server
+                                    if (profile.usageCount !== undefined) {
+                                        GlobalUsageCounter.syncFromServer(profile.usageCount, profile.usageLimit || 6)
+                                        updateStatus()
+                                    }
                                 }
                             } else {
                                 console.warn('Profile API responded with', res.status)
@@ -67,7 +74,7 @@ export function UserProfile() {
 
         const interval = setInterval(updateStatus, 5000) // Update every 5s
         return () => clearInterval(interval)
-    }, [session])
+    }, [user, isLoaded, isSignedIn])
 
     const updateStatus = () => {
         // Usage
@@ -97,10 +104,10 @@ export function UserProfile() {
     }
 
     // Display session user name by default, but override with onboarding name if available
-    const displayUserName = userName || session?.user?.name || "Guest"
-    const displayUserEmail = session?.user?.email || ""
+    const displayUserName = userName || user?.fullName || "Guest"
+    const displayUserEmail = user?.primaryEmailAddress?.emailAddress || ""
 
-    if (status === "loading") {
+    if (!isLoaded) {
         return (
             <div className="p-4 border-t border-border/50">
                 <div className="flex items-center gap-3">
@@ -114,11 +121,11 @@ export function UserProfile() {
         )
     }
 
-    if (!session) {
+    if (!isSignedIn) {
         return (
             <div className="p-4 border-t border-border/50">
                 <Button
-                    onClick={() => signIn("google", { callbackUrl: "/onboarding" })}
+                    onClick={() => openSignIn()}
                     className="w-full justify-start gap-2"
                     variant="outline"
                 >
@@ -146,7 +153,7 @@ export function UserProfile() {
                 <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="w-full justify-start gap-3 h-auto p-2 hover:bg-muted/50">
                         <Avatar className="w-10 h-10 border border-border">
-                            <AvatarImage src={session.user?.image || ""} alt={displayUserName} />
+                            <AvatarImage src={user?.imageUrl || ""} alt={displayUserName} />
                             <AvatarFallback>{userInitials}</AvatarFallback>
                         </Avatar>
                         <div className="flex-1 text-left overflow-hidden">
@@ -162,6 +169,11 @@ export function UserProfile() {
                                         <>Free Tier</>
                                     )}
                                 </Badge>
+                                {remainingOperations === 0 && !isPro && (
+                                    <Badge variant="destructive" className="text-[10px] px-1 py-0 h-4">
+                                        Trial Ended
+                                    </Badge>
+                                )}
                             </div>
                         </div>
                     </Button>
@@ -197,9 +209,16 @@ export function UserProfile() {
                                 <Zap className="w-3 h-3 mr-2" />
                                 Usage
                             </div>
-                            <span className={activeProvider ? "text-green-500 font-medium" : remainingOperations > 0 ? "text-orange-500 font-medium" : "text-red-500 font-medium"}>
-                                {activeProvider ? "Unlimited" : `${remainingOperations}/6 Remaining`}
-                            </span>
+                            <div className="flex flex-col items-end">
+                                <span className={activeProvider ? "text-green-500 font-medium" : remainingOperations > 0 ? "text-orange-500 font-medium" : "text-red-500 font-medium"}>
+                                    {activeProvider ? "Unlimited" : `${remainingOperations}/6 Remaining`}
+                                </span>
+                                {remainingOperations === 0 && !activeProvider && (
+                                    <span className="text-[10px] text-muted-foreground mt-0.5">
+                                        Falling back to Google Auth
+                                    </span>
+                                )}
+                            </div>
                         </div>
                         <div className="flex items-center justify-between">
                             <div className="flex items-center text-muted-foreground">
@@ -213,22 +232,23 @@ export function UserProfile() {
                     </div>
 
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => router.push('/onboarding')}>
+                    <DropdownMenuItem onClick={() => router.push('/onboarding?mode=edit')}>
                         <User className="w-4 h-4 mr-2" />
                         Profile Details
                     </DropdownMenuItem>
-                    <DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push('/settings/keys')}>
                         <Settings className="w-4 h-4 mr-2" />
                         Settings & API Keys
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
-                        onClick={async () => { await signOut({ callbackUrl: '/' }); router.push('/') }}
+                        onClick={async () => { await signOut({ redirectUrl: '/' }) }}
                         className="text-red-500 focus:text-red-500 cursor-pointer"
                     >
                         <LogOut className="w-4 h-4 mr-2" />
                         Sign Out
                     </DropdownMenuItem>
+
                 </DropdownMenuContent>
             </DropdownMenu>
         </div>

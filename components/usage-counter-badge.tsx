@@ -72,7 +72,7 @@ export function UsageCounterBadge() {
                                 Add your own API key to continue using AI features.
                             </p>
                             <Button size="sm" className="w-full" asChild>
-                                <a href="#settings">Add API Key</a>
+                                <a href="/settings/keys">Add API Key</a>
                             </Button>
                         </div>
                     )}

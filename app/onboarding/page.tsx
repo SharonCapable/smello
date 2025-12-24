@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useSession } from "next-auth/react"
+import { useUser } from "@clerk/nextjs"
 import { useRouter } from "next/navigation"
 import { OnboardingFlow } from "@/components/onboarding-flow"
 import { Loader2 } from "lucide-react"
@@ -13,23 +13,23 @@ interface OnboardingData {
 }
 
 export default function OnboardingPage() {
-    const { data: session, status } = useSession()
+    const { user, isLoaded, isSignedIn } = useUser()
     const router = useRouter()
     const [isChecking, setIsChecking] = useState(true)
 
     useEffect(() => {
         const checkOnboardingStatus = async () => {
-            if (status === "loading") return
+            if (!isLoaded) return
 
-            if (status === "unauthenticated") {
+            if (!isSignedIn) {
                 // Redirect to home if not authenticated
                 router.push("/")
                 return
             }
 
-            if (session?.user) {
+            if (user) {
                 try {
-                    const uid = (session.user as any).uid || session.user.email?.replace(/[^a-zA-Z0-9]/g, '_')
+                    const uid = user.id
                     if (uid) {
                         const res = await fetch(`/api/profile/${uid}`)
                         if (res.ok) {
@@ -37,7 +37,6 @@ export default function OnboardingPage() {
 
                             if (userProfile?.onboardingCompleted) {
                                 // Already completed onboarding, redirect to app
-                                // Already completed onboarding, redirect to app logic at home
                                 router.push("/")
                                 return
                             }
@@ -52,13 +51,13 @@ export default function OnboardingPage() {
         }
 
         checkOnboardingStatus()
-    }, [session, status, router])
+    }, [user, isLoaded, isSignedIn, router])
 
     const handleOnboardingComplete = async (data: OnboardingData) => {
-        if (!session?.user) return
+        if (!user) return
 
         try {
-            const uid = (session.user as any).uid || session.user.email?.replace(/[^a-zA-Z0-9]/g, '_')
+            const uid = user.id
 
             if (uid) {
                 // Update user profile with onboarding data via server-side API (firebase-admin)
@@ -66,10 +65,10 @@ export default function OnboardingPage() {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        email: session.user.email || '',
+                        email: user.primaryEmailAddress?.emailAddress || '',
                         name: data.name,
                         displayName: data.name,
-                        photoURL: session.user.image || '',
+                        photoURL: user.imageUrl || '',
                         role: data.role,
                         selectedPath: data.usageType === "personal" ? "pm" : "team",
                         onboardingCompleted: true,
@@ -99,7 +98,7 @@ export default function OnboardingPage() {
         router.push("/")
     }
 
-    if (status === "loading" || isChecking) {
+    if (!isLoaded || isChecking) {
         return (
             <div className="min-h-screen flex items-center justify-center">
                 <div className="text-center space-y-4">
@@ -113,7 +112,7 @@ export default function OnboardingPage() {
     return (
         <OnboardingFlow
             onComplete={handleOnboardingComplete}
-            isAuthenticated={status === "authenticated"}
+            isAuthenticated={isSignedIn}
             onBack={handleBack}
         />
     )

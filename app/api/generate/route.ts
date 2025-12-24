@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import admin from 'firebase-admin'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+import { auth } from '@clerk/nextjs/server'
 import { decryptText } from '@/lib/crypto'
 import { refreshGoogleAccessToken } from '@/lib/oauth'
 
@@ -11,14 +10,6 @@ function initAdmin() {
   if (!raw) throw new Error('FIREBASE_SERVICE_ACCOUNT is not set')
   const serviceAccount = typeof raw === 'string' ? JSON.parse(raw) : raw
   admin.initializeApp({ credential: admin.credential.cert(serviceAccount as any) })
-}
-
-async function getSession() {
-  try {
-    return await getServerSession(authOptions as any)
-  } catch (e) {
-    return null
-  }
 }
 
 export async function POST(req: Request) {
@@ -35,19 +26,21 @@ export async function POST(req: Request) {
     // 4) Client-provided key
 
     // Get session (require sign-in for generation)
-    // Get session (require sign-in for generation)
-    const session = await getSession()
-    if (!session) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 })
+    const { userId } = await auth()
+    if (!userId) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 })
 
     // Attempt to extract meaningful user ID, fallback to email or something stable. 
     // If we can't get a user ID, we can't enforce personalized limits properly, 
     // but blocking them might be worse. Let's try best effort.
-    const sessionUser = (session as any).user || session.user
-    const sessionUid = sessionUser?.uid || sessionUser?.email?.replace(/[^a-zA-Z0-9]/g, '_') || 'unknown_user'
+    const sessionUid = userId
 
-    const sessionAccessToken = (session as any).accessToken || null
-    const sessionRefreshToken = (session as any).refreshToken || null
-    const sessionExpiresAt = (session as any).expiresAt || null
+    // Clerk's auth() does not directly provide sessionAccessToken, sessionRefreshToken, sessionExpiresAt.
+    // These would typically come from a database lookup or a custom session management if needed with Clerk.
+    // For now, setting them to null to avoid breaking existing logic that might rely on them being defined,
+    // but the Google OAuth refresh logic will likely need to be re-evaluated or removed if these are not available.
+    const sessionAccessToken = null
+    const sessionRefreshToken = null
+    const sessionExpiresAt = null
 
     // If user is authenticated we can attempt to fetch their stored keys
     let storedKeys: { geminiKey?: string; claudeKey?: string } | null = null

@@ -1,32 +1,33 @@
 "use client"
 
-import { SessionProvider, useSession } from "next-auth/react"
+"use client"
+
+import { useUser } from "@clerk/nextjs"
 import { useEffect } from "react"
 import { ApiKeyManager } from '@/lib/api-key-manager'
-// Use server-side profile API to avoid client Firestore permission issues
 
 function AuthSync({ children }: { children: React.ReactNode }) {
-    const { data: session, status } = useSession()
+    const { user, isLoaded, isSignedIn } = useUser()
 
     useEffect(() => {
         // Sync user profile to Firestore when authenticated
-        if (status === "authenticated" && session?.user) {
+        if (isLoaded && isSignedIn && user) {
             const syncUserProfile = async () => {
                 try {
-                    const uid = (session.user as any).uid || session.user.email?.replace(/[^a-zA-Z0-9]/g, '_')
+                    const uid = user.id
+                    const email = user.primaryEmailAddress?.emailAddress
 
                     if (uid) {
-                        // Persist basic profile server-side via admin SDK
                         try {
                             await fetch(`/api/profile/${uid}`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
                                     uid,
-                                    email: session.user.email || '',
-                                    name: session.user.name || '',
-                                    displayName: session.user.name || '',
-                                    photoURL: session.user.image || '',
+                                    email: email || '',
+                                    name: user.fullName || '',
+                                    displayName: user.fullName || '',
+                                    photoURL: user.imageUrl || '',
                                 }),
                             })
                         } catch (e) {
@@ -46,15 +47,13 @@ function AuthSync({ children }: { children: React.ReactNode }) {
                 // ignore
             }
         }
-    }, [session, status])
+    }, [user, isLoaded, isSignedIn])
 
     return <>{children}</>
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     return (
-        <SessionProvider>
-            <AuthSync>{children}</AuthSync>
-        </SessionProvider>
+        <AuthSync>{children}</AuthSync>
     )
 }
