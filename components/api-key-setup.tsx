@@ -10,34 +10,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { AlertCircle, Key, Eye, EyeOff } from "lucide-react"
 import { ApiKeyManager } from "@/lib/api-key-manager"
-import { useSession } from 'next-auth/react'
+import { useUser } from '@clerk/nextjs'
 import { useToast } from '@/hooks/use-toast'
-
-interface ApiKeySetupProps {
-  isOpen: boolean
-  onApiKeySet: () => void
-  onClose: () => void
-}
-
-interface ApiKeySetupProps {
-  isOpen: boolean
-  onApiKeySet: () => void
-  onClose: () => void
-  initialKey?: string
-}
+// ...
 
 export function ApiKeySetup({ isOpen, onApiKeySet, onClose, initialKey }: ApiKeySetupProps) {
   const [apiKey, setApiKey] = useState("")
   const [showApiKey, setShowApiKey] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [saveToAccount, setSaveToAccount] = useState(true)
-  const { data: session, status } = useSession()
+  const { user, isLoaded, isSignedIn } = useUser()
   const { toast } = useToast()
 
   useEffect(() => {
     // Default save-to-account only when authenticated
-    setSaveToAccount(status === 'authenticated')
-  }, [status])
+    if (isLoaded) {
+      setSaveToAccount(isSignedIn)
+    }
+  }, [isLoaded, isSignedIn])
 
   useEffect(() => {
     if (isOpen && initialKey) setApiKey(initialKey)

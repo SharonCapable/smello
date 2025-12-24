@@ -33,7 +33,7 @@ import { useTheme } from "next-themes"
 import { SidebarNavigation } from "@/components/sidebar-navigation"
 // Import PDF utilities
 import { parsePdfDocument, validatePdfFile } from '@/lib/pdf-utils';
-import { useSession } from "next-auth/react"
+import { useUser } from "@clerk/nextjs"
 import { LandingPage } from "@/components/landing-page"
 import { OnboardingFlow } from "@/components/onboarding-flow"
 import { TeamDashboard } from "@/components/team-dashboard"
@@ -83,7 +83,7 @@ export default function HomePage() {
   const [extractedDescription, setExtractedDescription] = useState<string>("");
   const [showEditableExtract, setShowEditableExtract] = useState(false);
 
-  const { data: session, status } = useSession()
+  const { user, isLoaded, isSignedIn } = useUser()
 
   // Workflow state
   const [workflowPhase, setWorkflowPhase] = useState<WorkflowPhase>("ideation")
@@ -96,13 +96,12 @@ export default function HomePage() {
   useEffect(() => {
     setMounted(true)
 
-    // Wait for session to load
-    if (status === "loading") return
+    if (!isLoaded) return
 
     // Check for temporary onboarding data (from pre-auth flow)
     const tempOnboardingData = localStorage.getItem("smello-onboarding-temp")
 
-    if (session && tempOnboardingData) {
+    if (isSignedIn && user && tempOnboardingData) {
       // User just authenticated after onboarding step 3
       const data = JSON.parse(tempOnboardingData)
       localStorage.setItem("smello-user-onboarding", JSON.stringify(data))
@@ -123,7 +122,7 @@ export default function HomePage() {
     // ONLY redirect if we are in a 'neutral' or 'auth' state.
     const isTransitionState = appState === "landing" || appState === "onboarding"
 
-    if (session) {
+    if (isSignedIn && user) {
       if (onboardingData) {
         const data = JSON.parse(onboardingData)
         // If we are currently in landing/onboarding, move them to their dashboard
@@ -138,7 +137,7 @@ export default function HomePage() {
       } else {
         // Session exists but no onboarding data in local storage.
         // Fetch from server to check if user has already onboarded.
-        const uid = (session.user as any).uid || session.user.email?.replace(/[^a-zA-Z0-9]/g, '_')
+        const uid = user.id
         if (uid) {
           fetch(`/api/profile/${uid}`)
             .then(res => res.json())
@@ -146,7 +145,7 @@ export default function HomePage() {
               if (data && data.onboardingCompleted) {
                 // Restore local storage
                 localStorage.setItem("smello-user-onboarding", JSON.stringify({
-                  name: data.name || session.user?.name,
+                  name: data.name || user.fullName,
                   role: data.role || "Product Manager",
                   usageType: data.selectedPath === "team" ? "team" : "personal"
                 }))
@@ -160,7 +159,6 @@ export default function HomePage() {
                 }
               } else {
                 // Not onboarded on server either.
-                // Stay on Landing Page (or could force 'onboarding' state if we wanted strict enforcement)
               }
             })
             .catch(e => console.error("Failed to sync profile on home load", e))
@@ -176,7 +174,7 @@ export default function HomePage() {
       }
       setIsCheckingProfile(false)
     }
-  }, [session, status, appState]) // Added status dependency
+  }, [user, isLoaded, isSignedIn, appState])
 
   useEffect(() => {
     if (entryMode === 'pdf' && parsedPdfText && !showEditableExtract) {
@@ -543,11 +541,14 @@ export default function HomePage() {
           )}
 
           {appState === "feature-prioritization" && (
-            <FeaturePrioritization />
+            <FeaturePrioritization onBack={handleBack} />
           )}
 
           {appState === "research-agent" && (
-            <ResearchAgent />
+            <ResearchAgent
+              project={currentProject}
+              onBack={() => setAppState(currentProject ? "project-view" : "workflow-home")}
+            />
           )}
 
           {appState === "settings" && (
@@ -561,49 +562,49 @@ export default function HomePage() {
           {appState === "prd-generator" && (
             <PRDGenerator
               project={currentProject}
-              onBack={() => setAppState(currentProject ? "project-edit" : "workflow-home")}
+              onBack={() => setAppState(currentProject ? "project-view" : "workflow-home")}
             />
           )}
 
           {appState === "technical-blueprint" && (
             <TechnicalBlueprint
               project={currentProject}
-              onBack={() => setAppState(currentProject ? "project-edit" : "workflow-home")}
+              onBack={() => setAppState(currentProject ? "project-view" : "workflow-home")}
             />
           )}
 
           {appState === "pitch-deck-generator" && (
             <PitchDeckGenerator
               project={currentProject}
-              onBack={() => setAppState("workflow-home")}
+              onBack={() => setAppState("project-view")}
             />
           )}
 
           {appState === "user-journey-map" && (
             <UserJourneyMap
               project={currentProject}
-              onBack={() => setAppState(currentProject ? "project-edit" : "workflow-home")}
+              onBack={() => setAppState(currentProject ? "project-view" : "workflow-home")}
             />
           )}
 
           {appState === "competitive-intelligence" && (
             <CompetitiveIntelligence
               project={currentProject}
-              onBack={() => setAppState(currentProject ? "project-edit" : "workflow-home")}
+              onBack={() => setAppState(currentProject ? "project-view" : "workflow-home")}
             />
           )}
 
           {appState === "roadmap-builder" && (
             <RoadmapBuilder
               project={currentProject}
-              onBack={() => setAppState("workflow-home")}
+              onBack={() => setAppState("project-view")}
             />
           )}
 
           {appState === "risk-analysis" && (
             <RiskAnalysis
               project={currentProject}
-              onBack={() => setAppState("workflow-home")}
+              onBack={() => setAppState("project-view")}
             />
           )}
         </main>

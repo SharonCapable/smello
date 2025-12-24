@@ -51,6 +51,7 @@ type AppState =
   | "project-manager"
   | "project-view"
   | "project-edit"
+  | "project-path-selector"
   | "idea-generator"
   | "feature-prioritization"
   | "research-agent"

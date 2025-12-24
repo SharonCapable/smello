@@ -14,7 +14,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { User, Briefcase, ArrowRight, CheckCircle2, Lock, LogIn, Loader2 } from "lucide-react"
-import { signIn } from "next-auth/react"
+import { useClerk } from "@clerk/nextjs"
 
 const PREDEFINED_ROLES = [
     "Product Manager",
@@ -53,6 +53,7 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack }: Onboardi
     })
     const [isSigningIn, setIsSigningIn] = useState(false)
     const [isCompleting, setIsCompleting] = useState(false)
+    const { openSignIn } = useClerk()
 
     // Skip step 3 if already authenticated, but show a "Finishing up" state
     useEffect(() => {
@@ -78,8 +79,8 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack }: Onboardi
         // Save onboarding state to localStorage TEMP so we can retrieve it after redirect
         localStorage.setItem("smello-onboarding-temp", JSON.stringify(data))
 
-        // Trigger Google Sign In
-        await signIn("google", { callbackUrl: "/" })
+        // Trigger Clerk Sign In
+        openSignIn({ forceRedirectUrl: "/onboarding" })
     }
 
     const handleFinishSetup = async () => {

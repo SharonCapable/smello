@@ -1,6 +1,5 @@
 "use client"
 
-import { useSession, signIn, signOut } from "next-auth/react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
@@ -14,12 +13,14 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { LogIn, LogOut, User, Settings, Sparkles, Zap, Brain, Briefcase } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { useUser, useClerk } from "@clerk/nextjs"
 import { GlobalUsageCounter } from "@/lib/global-usage-counter"
 import { setUserId } from "@/lib/storage-hybrid"
 import { UsageCounterBadge } from "@/components/usage-counter-badge"
 
 export function AppHeader() {
-    const { data: session, status } = useSession()
+    const { user, isLoaded, isSignedIn } = useUser()
+    const { signOut, openSignIn } = useClerk()
     const [mounted, setMounted] = useState(false)
     const [remainingOperations, setRemainingOperations] = useState(0)
     const [activeProvider, setActiveProvider] = useState<string | null>(null)
@@ -33,9 +34,9 @@ export function AppHeader() {
         // Load user profile from Firestore
         // Load user profile from Firestore via Server API
         const loadUserProfile = async () => {
-            if (session?.user) {
+            if (isLoaded && isSignedIn && user) {
                 try {
-                    const uid = (session.user as any).uid || session.user.email?.replace(/[^a-zA-Z0-9]/g, '_')
+                    const uid = user.id
                     if (uid) {
                         // Set user ID for hybrid storage
                         setUserId(uid)
@@ -83,7 +84,7 @@ export function AppHeader() {
 
         const interval = setInterval(updateStatus, 5000) // Update every 5s
         return () => clearInterval(interval)
-    }, [session])
+    }, [user, isLoaded, isSignedIn])
 
     const updateStatus = () => {
         // Usage
@@ -113,10 +114,10 @@ export function AppHeader() {
     }
 
     // Display session user name by default, but override with onboarding name if available
-    const displayUserName = userName || session?.user?.name || "Guest"
-    const displayUserEmail = session?.user?.email || ""
+    const displayUserName = userName || user?.fullName || "Guest"
+    const displayUserEmail = user?.primaryEmailAddress?.emailAddress || ""
 
-    if (status === "loading") {
+    if (!isLoaded) {
         return (
             <header className="border-b border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40">
                 <div className="container flex h-16 items-center justify-between px-4">
@@ -131,7 +132,7 @@ export function AppHeader() {
         )
     }
 
-    if (!session) {
+    if (!isSignedIn) {
         return (
             <header className="border-b border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40">
                 <div className="container flex h-16 items-center justify-between px-4">
@@ -139,7 +140,7 @@ export function AppHeader() {
                         <UsageCounterBadge />
                     </div>
                     <Button
-                        onClick={() => signIn("google", { callbackUrl: "/onboarding" })}
+                        onClick={() => openSignIn()}
                         variant="outline"
                         className="gap-2"
                     >
@@ -179,7 +180,7 @@ export function AppHeader() {
                                     </p>
                                 </div>
                                 <Avatar className="w-10 h-10 border-2 border-border">
-                                    <AvatarImage src={session.user?.image || ""} alt={displayUserName} />
+                                    <AvatarImage src={user?.imageUrl || ""} alt={displayUserName} />
                                     <AvatarFallback className="bg-accent text-accent-foreground font-semibold">
                                         {userInitials}
                                     </AvatarFallback>
@@ -243,17 +244,17 @@ export function AppHeader() {
                             </div>
 
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => (window.location.href = '/settings')}>
                                 <User className="w-4 h-4 mr-2" />
                                 Profile Details
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => (window.location.href = '/settings')}>
                                 <Settings className="w-4 h-4 mr-2" />
                                 Settings & API Keys
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
-                                onClick={() => signOut({ callbackUrl: '/' })}
+                                onClick={() => signOut({ redirectUrl: '/' })}
                                 className="text-red-500 focus:text-red-500 focus:bg-red-50 dark:focus:bg-red-950/30 cursor-pointer"
                             >
                                 <LogOut className="w-4 h-4 mr-2" />

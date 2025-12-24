@@ -3,13 +3,14 @@
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ArrowRight, Sparkles, Target, Layers, Zap, Users, Layout, Rocket } from "lucide-react"
-import { signIn } from "next-auth/react"
+import { useClerk } from "@clerk/nextjs"
 
 interface LandingPageProps {
     onGetStarted: () => void
 }
 
 export function LandingPage({ onGetStarted }: LandingPageProps) {
+    const { openSignIn } = useClerk()
     return (
         <div className="min-h-screen bg-background grid-pattern flex flex-col">
             {/* Navigation Bar */}
@@ -33,7 +34,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
                             <a href="#teams" className="hover:text-foreground transition-colors">For Teams</a>
                             <a href="#pricing" className="hover:text-foreground transition-colors">Pricing</a>
                         </nav>
-                        <Button variant="ghost" className="font-medium" onClick={() => signIn("google", { callbackUrl: "/onboarding" })}>Sign In</Button>
+                        <Button variant="ghost" className="font-medium" onClick={() => openSignIn()}>Sign In</Button>
                         <Button onClick={onGetStarted} className="font-medium shadow-lg shadow-primary/20">Get Started</Button>
                     </div>
                 </div>
