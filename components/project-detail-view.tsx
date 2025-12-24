@@ -60,6 +60,7 @@ export function ProjectDetailView({ project, onBack, onEdit, onNavigateToTool }:
 
   // Tool configuration
   const tools = [
+    { id: "project-edit", name: "Epics & User Stories", icon: FolderOpen, description: "Manage backlog & requirements" },
     { id: "prd-generator", name: "PRD Generator", icon: FileText, description: "Product Requirements Document" },
     { id: "competitive-intelligence", name: "Competitive Analysis", icon: Swords, description: "SWOT & feature matrix" },
     { id: "feature-prioritization", name: "Feature Prioritization", icon: Target, description: "Prioritize features" },
@@ -118,52 +119,6 @@ export function ProjectDetailView({ project, onBack, onEdit, onNavigateToTool }:
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <FolderOpen className="w-4 h-4 text-accent" />
-              <div>
-                <p className="text-2xl font-bold">{project.epics.length}</p>
-                <p className="text-xs text-muted-foreground">Epics</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-accent" />
-              <div>
-                <p className="text-2xl font-bold">{totalStories}</p>
-                <p className="text-xs text-muted-foreground">User Stories</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <UserCheck className="w-4 h-4 text-accent" />
-              <div>
-                <p className="text-2xl font-bold">{totalCriteria}</p>
-                <p className="text-xs text-muted-foreground">Acceptance Criteria</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-accent" />
-              <div>
-                <p className="text-sm font-semibold">Last Updated</p>
-                <p className="text-xs text-muted-foreground">{new Date(project.updated_at).toLocaleDateString()}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* Main Content - Tabs */}
       <Tabs defaultValue="overview" className="w-full">
@@ -353,7 +308,10 @@ export function ProjectDetailView({ project, onBack, onEdit, onNavigateToTool }:
               </CardHeader>
               <CardContent>
                 {project.pdf_source_text ? (
-                  <DocumentViewer content={project.pdf_source_text} />
+                  <DocumentViewer
+                    projectData={project}
+                    documentContent={project.pdf_source_text}
+                  />
                 ) : (
                   <p className="text-muted-foreground">No source document available</p>
                 )}

@@ -515,6 +515,7 @@ export default function HomePage() {
               project={currentProject}
               onBack={() => setAppState("project-manager")}
               onEdit={handleEditProject}
+              onNavigateToTool={(tool) => setAppState(tool as AppState)}
             />
           )}
 
