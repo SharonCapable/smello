@@ -237,18 +237,18 @@ export function AppHeader() {
                                         <Brain className="w-3 h-3 mr-2" />
                                         AI Provider
                                     </div>
-                                    <span className="font-medium truncate max-w-[120px]">
-                                        {activeProvider || "System Default"}
+                                    <span className="font-medium truncate max-w-[120px]" title={activeProvider ? `Using your ${activeProvider} API key` : "Using server-side Gemini API"}>
+                                        {activeProvider || "Built-in API"}
                                     </span>
                                 </div>
                             </div>
 
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => (window.location.href = '/settings')}>
+                            <DropdownMenuItem onClick={() => (window.location.href = '/onboarding?mode=edit')}>
                                 <User className="w-4 h-4 mr-2" />
                                 Profile Details
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => (window.location.href = '/settings')}>
+                            <DropdownMenuItem onClick={() => (window.location.href = '/settings/keys')}>
                                 <Settings className="w-4 h-4 mr-2" />
                                 Settings & API Keys
                             </DropdownMenuItem>
