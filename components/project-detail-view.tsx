@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import {
   Dialog,
   DialogContent,
@@ -21,22 +20,24 @@ import {
   Download,
   Edit3,
   Target,
-  AlertTriangle,
-  CheckCircle,
-  ExternalLink,
-  Eye,
-  Layout,
-  Database,
-  Server,
-  Cpu,
+  Users,
+  Building2,
+  FileCheck,
   Lightbulb,
-  Plus,
-  Search
+  ArrowLeft,
+  Layout,
+  Shield,
+  Swords,
+  Map,
+  UserCheck,
+  GitBranch
 } from "lucide-react"
 import { EnhancedExportDialog } from "@/components/enhanced-export-dialog"
-import { JiraIntegration } from "@/components/jira-integration"
 import { DocumentViewer } from "@/components/document-viewer"
 import type { StoredProject } from "@/lib/storage"
+import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 interface ProjectDetailViewProps {
   project: StoredProject
@@ -46,7 +47,8 @@ interface ProjectDetailViewProps {
 }
 
 export function ProjectDetailView({ project, onBack, onEdit, onNavigateToTool }: ProjectDetailViewProps) {
-  const [expandedEpic, setExpandedEpic] = useState<string | null>(null)
+  const [isEditingOverview, setIsEditingOverview] = useState(false)
+  const [editedProject, setEditedProject] = useState(project)
 
   const totalStories = project.epics.reduce((acc, epic) => acc + epic.user_stories.length, 0)
   const totalCriteria = project.epics.reduce(
@@ -54,339 +56,312 @@ export function ProjectDetailView({ project, onBack, onEdit, onNavigateToTool }:
     0,
   )
 
-  const getPriorityColor = (priority?: string) => {
-    switch (priority?.toLowerCase()) {
-      case "high":
-        return "bg-red-500/10 text-red-500 border-red-500/20"
-      case "medium":
-        return "bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
-      case "low":
-        return "bg-green-500/10 text-green-500 border-green-500/20"
-      default:
-        return "bg-muted text-muted-foreground"
+  const hasSourceDocument = !!(project.pdf_source_text || project.pdf_source_name)
+
+  // Tool configuration
+  const tools = [
+    { id: "prd-generator", name: "PRD Generator", icon: FileText, description: "Product Requirements Document" },
+    { id: "competitive-intelligence", name: "Competitive Analysis", icon: Swords, description: "SWOT & feature matrix" },
+    { id: "feature-prioritization", name: "Feature Prioritization", icon: Target, description: "Prioritize features" },
+    { id: "user-journey-map", name: "User Journey", icon: Map, description: "Map user flows" },
+    { id: "technical-blueprint", name: "Technical Blueprint", icon: Layout, description: "Architecture design" },
+    { id: "research-agent", name: "Research Agent", icon: Lightbulb, description: "AI-powered research" },
+    { id: "roadmap-builder", name: "Roadmap Builder", icon: GitBranch, description: "Build product roadmap" },
+    { id: "risk-analysis", name: "Risk Analysis", icon: Shield, description: "Identify & mitigate risks" },
+    { id: "pitch-deck-generator", name: "Pitch Deck", icon: FileCheck, description: "Investor presentation" },
+  ]
+
+  const handleSaveOverview = () => {
+    // TODO: Implement save logic to update project in storage
+    setIsEditingOverview(false)
+    // Call parent update handler if provided
+    if (onEdit) {
+      // onEdit() could be modified to accept the updated project
     }
   }
-
-  const getStatusColor = (status?: string) => {
-    switch (status?.toLowerCase()) {
-      case "done":
-        return "bg-green-100 text-green-800"
-      case "in qa":
-        return "bg-purple-100 text-purple-800"
-      case "in progress":
-        return "bg-blue-100 text-blue-800"
-      case "blocked":
-        return "bg-red-100 text-red-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
-  }
-
-  // Helper to parse PRD if string or object
-  const getPrdContent = () => {
-    if (!project.prd) return null;
-    if (typeof project.prd === 'string') {
-      return { fullDocument: project.prd };
-    }
-    return project.prd;
-  }
-
-  const prd = getPrdContent();
 
   return (
-    <div className="max-w-6xl mx-auto pb-10">
-      {/* Project Header */}
-      <div className="mb-8">
-        <Button variant="ghost" className="mb-4 pl-0" onClick={onBack}>
-          ← Back to Projects
-        </Button>
-        <div className="flex items-center justify-between mb-4">
+    <div className="w-full h-full p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" onClick={onBack} className="gap-2">
+            <ArrowLeft className="w-4 h-4" />
+            Back to Projects
+          </Button>
           <div>
-            <h2 className="text-3xl font-bold text-foreground mb-2">{project.name}</h2>
-            <p className="text-muted-foreground text-lg">{project.product.description}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="bg-transparent">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Export Project</DialogTitle>
-                  <DialogDescription>
-                    Choose how you want to export "{project.name}" with enhanced PM tool integrations
-                  </DialogDescription>
-                </DialogHeader>
-                <EnhancedExportDialog project={project} />
-              </DialogContent>
-            </Dialog>
-            {onEdit && (
-              <Button variant="outline" onClick={onEdit} className="bg-transparent">
-                <Edit3 className="w-4 h-4 mr-2" />
-                Edit
-              </Button>
-            )}
+            <h1 className="text-3xl font-bold">{project.name}</h1>
+            <p className="text-muted-foreground text-sm">
+              Created {new Date(project.created_at).toLocaleDateString()} • Updated {new Date(project.updated_at).toLocaleDateString()}
+            </p>
           </div>
         </div>
-
-        {/* Project Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <Card className="bg-card border-border">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <FolderOpen className="w-4 h-4 text-accent" />
-                <div>
-                  <p className="text-2xl font-bold">{project.epics.length}</p>
-                  <p className="text-xs text-muted-foreground">Epics</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-border">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-accent" />
-                <div>
-                  <p className="text-2xl font-bold">{totalStories}</p>
-                  <p className="text-xs text-muted-foreground">User Stories</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-border">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 text-accent" />
-                <div>
-                  <p className="text-2xl font-bold">{totalCriteria}</p>
-                  <p className="text-xs text-muted-foreground">Acceptance Criteria</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-border">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-accent" />
-                <div>
-                  <p className="text-sm font-semibold">Updated</p>
-                  <p className="text-xs text-muted-foreground">{new Date(project.updated_at).toLocaleDateString()}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="flex gap-2">
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Download className="w-4 h-4 mr-2" />
+                Export
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Export Project</DialogTitle>
+                <DialogDescription>
+                  Choose how you want to export "{project.name}"
+                </DialogDescription>
+              </DialogHeader>
+              <EnhancedExportDialog project={project} />
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
-      <div className="grid md:grid-cols-4 gap-6">
-        {/* Project Sidebar / Navigation */}
-        <div className="md:col-span-1 space-y-4">
-          <Card className="sticky top-24">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Layout className="w-4 h-4 text-accent" />
-                Project Tools
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-2 space-y-1">
-              <Button
-                variant="ghost"
-                className="w-full justify-start gap-3 h-10 px-3 hover:bg-accent/10 transition-colors"
-                onClick={() => { }} // Already on dashboard
-              >
-                <FolderOpen className="w-4 h-4 text-accent" />
-                Dashboard
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start gap-3 h-10 px-3 hover:bg-accent/10"
-                onClick={() => onNavigateToTool?.('prd-generator')}
-              >
-                <FileText className="w-4 h-4 text-blue-500" />
-                PRD & Docs
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start gap-3 h-10 px-3 hover:bg-accent/10"
-                onClick={() => onNavigateToTool?.('manual-flow')}
-              >
-                <Target className="w-4 h-4 text-orange-500" />
-                Epics & Stories
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start gap-3 h-10 px-3 hover:bg-accent/10"
-                onClick={() => onNavigateToTool?.('technical-blueprint')}
-              >
-                <Cpu className="w-4 h-4 text-purple-500" />
-                Architecture
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start gap-3 h-10 px-3 hover:bg-accent/10"
-                onClick={() => onNavigateToTool?.('research-agent')}
-              >
-                <Search className="w-4 h-4 text-green-500" />
-                Market Research
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Main Content Area */}
-        <div className="md:col-span-3 space-y-6">
-          {/* Tool Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Card
-              className="cursor-pointer group hover:border-accent/50 transition-all hover:shadow-md"
-              onClick={() => onNavigateToTool?.('prd-generator')}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-colors">
-                    <FileText className="w-5 h-5" />
-                  </div>
-                  {prd ? (
-                    <Badge variant="outline" className="text-green-600 bg-green-50 border-green-200">Generated</Badge>
-                  ) : (
-                    <Badge variant="secondary">Missing</Badge>
-                  )}
-                </div>
-                <h3 className="font-semibold text-lg mb-1">Product Requirements</h3>
-                <p className="text-sm text-muted-foreground">The full PRD including functional and non-functional specs.</p>
-              </CardContent>
-            </Card>
-
-            <Card
-              className="cursor-pointer group hover:border-accent/50 transition-all hover:shadow-md"
-              onClick={() => onNavigateToTool?.('manual-flow')}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500 group-hover:bg-orange-500 group-hover:text-white transition-colors">
-                    <Target className="w-5 h-5" />
-                  </div>
-                  <Badge variant="outline" className="text-blue-600 bg-blue-50 border-blue-200">{project.epics.length} Epics</Badge>
-                </div>
-                <h3 className="font-semibold text-lg mb-1">Backlog & Stories</h3>
-                <p className="text-sm text-muted-foreground">Detailed user stories with acceptance criteria and priority.</p>
-              </CardContent>
-            </Card>
-
-            <Card
-              className="cursor-pointer group hover:border-accent/50 transition-all hover:shadow-md"
-              onClick={() => onNavigateToTool?.('technical-blueprint')}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-500 group-hover:bg-purple-500 group-hover:text-white transition-colors">
-                    <Cpu className="w-5 h-5" />
-                  </div>
-                  {project.blueprints ? (
-                    <Badge variant="outline" className="text-green-600 bg-green-50 border-green-200">Ready</Badge>
-                  ) : (
-                    <Badge variant="secondary">Incomplete</Badge>
-                  )}
-                </div>
-                <h3 className="font-semibold text-lg mb-1">Architecture Blueprint</h3>
-                <p className="text-sm text-muted-foreground">Technical specs, database schema, and API documentation.</p>
-              </CardContent>
-            </Card>
-
-            <Card
-              className="cursor-pointer group hover:border-accent/50 transition-all hover:shadow-md"
-              onClick={() => onNavigateToTool?.('research-agent')}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center text-green-500 group-hover:bg-green-500 group-hover:text-white transition-colors">
-                    <Search className="w-5 h-5" />
-                  </div>
-                  <Badge variant="secondary">Analysis</Badge>
-                </div>
-                <h3 className="font-semibold text-lg mb-1">Market Research</h3>
-                <p className="text-sm text-muted-foreground">Competitor analysis and market insights for your idea.</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Project Vision Card */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle>Product Vision</CardTitle>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={onEdit}>
-                <Edit3 className="w-4 h-4" />
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <FolderOpen className="w-4 h-4 text-accent" />
               <div>
-                <h4 className="font-semibold mb-1 text-xs uppercase tracking-wider text-muted-foreground">Description</h4>
-                <p className="text-base leading-relaxed">{project.product.description}</p>
+                <p className="text-2xl font-bold">{project.epics.length}</p>
+                <p className="text-xs text-muted-foreground">Epics</p>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                {project.product.target_audience && (
-                  <div>
-                    <h4 className="font-semibold mb-1 text-xs uppercase tracking-wider text-muted-foreground">Target Audience</h4>
-                    <p className="text-sm">{project.product.target_audience}</p>
-                  </div>
-                )}
-                {project.product.sector && (
-                  <div>
-                    <h4 className="font-semibold mb-1 text-xs uppercase tracking-wider text-muted-foreground">Sector</h4>
-                    <Badge variant="secondary" className="mt-1">{project.product.sector}</Badge>
-                  </div>
-                )}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-accent" />
+              <div>
+                <p className="text-2xl font-bold">{totalStories}</p>
+                <p className="text-xs text-muted-foreground">User Stories</p>
               </div>
-              {project.product.key_features && project.product.key_features.length > 0 && (
-                <div>
-                  <h4 className="font-semibold mb-1 text-xs uppercase tracking-wider text-muted-foreground">Key Features</h4>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {project.product.key_features.map((f, i) => (
-                      <Badge key={i} variant="outline" className="bg-accent/5">{f}</Badge>
-                    ))}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <UserCheck className="w-4 h-4 text-accent" />
+              <div>
+                <p className="text-2xl font-bold">{totalCriteria}</p>
+                <p className="text-xs text-muted-foreground">Acceptance Criteria</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-accent" />
+              <div>
+                <p className="text-sm font-semibold">Last Updated</p>
+                <p className="text-xs text-muted-foreground">{new Date(project.updated_at).toLocaleDateString()}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Main Content - Tabs */}
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="tools">Tools</TabsTrigger>
+          {hasSourceDocument && <TabsTrigger value="source">Source Document</TabsTrigger>}
+        </TabsList>
+
+        {/* Overview Tab */}
+        <TabsContent value="overview" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Project Overview</CardTitle>
+                <CardDescription>Key information about your product</CardDescription>
+              </div>
+              {!isEditingOverview && (
+                <Button variant="outline" size="sm" onClick={() => setIsEditingOverview(true)}>
+                  <Edit3 className="w-4 h-4 mr-2" />
+                  Edit Overview
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {isEditingOverview ? (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="product-name">Product Name</Label>
+                    <Input
+                      id="product-name"
+                      value={editedProject.product.name}
+                      onChange={(e) => setEditedProject({
+                        ...editedProject,
+                        product: { ...editedProject.product, name: e.target.value }
+                      })}
+                    />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea
+                      id="description"
+                      value={editedProject.product.description}
+                      onChange={(e) => setEditedProject({
+                        ...editedProject,
+                        product: { ...editedProject.product, description: e.target.value }
+                      })}
+                      rows={4}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="target-audience">Target Audience</Label>
+                    <Input
+                      id="target-audience"
+                      value={editedProject.product.target_audience}
+                      onChange={(e) => setEditedProject({
+                        ...editedProject,
+                        product: { ...editedProject.product, target_audience: e.target.value }
+                      })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sector">Sector</Label>
+                    <Input
+                      id="sector"
+                      value={editedProject.product.sector}
+                      onChange={(e) => setEditedProject({
+                        ...editedProject,
+                        product: { ...editedProject.product, sector: e.target.value }
+                      })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="vision">Product Vision</Label>
+                    <Textarea
+                      id="vision"
+                      value={editedProject.product.vision || ""}
+                      onChange={(e) => setEditedProject({
+                        ...editedProject,
+                        product: { ...editedProject.product, vision: e.target.value }
+                      })}
+                      rows={3}
+                      placeholder="What is the long-term vision for this product?"
+                    />
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="outline" onClick={() => {
+                      setEditedProject(project)
+                      setIsEditingOverview(false)
+                    }}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSaveOverview}>
+                      Save Changes
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <FileText className="w-4 h-4 text-accent" />
+                      <h3 className="font-semibold">Description</h3>
+                    </div>
+                    <p className="text-muted-foreground">{project.product.description}</p>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Users className="w-4 h-4 text-accent" />
+                      <h3 className="font-semibold">Target Audience</h3>
+                    </div>
+                    <p className="text-muted-foreground">{project.product.target_audience}</p>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Building2 className="w-4 h-4 text-accent" />
+                      <h3 className="font-semibold">Sector</h3>
+                    </div>
+                    <p className="text-muted-foreground">{project.product.sector}</p>
+                  </div>
+
+                  {project.product.vision && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Target className="w-4 h-4 text-accent" />
+                        <h3 className="font-semibold">Product Vision</h3>
+                      </div>
+                      <p className="text-muted-foreground">{project.product.vision}</p>
+                    </div>
+                  )}
+
+                  {project.product.key_features && project.product.key_features.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Lightbulb className="w-4 h-4 text-accent" />
+                        <h3 className="font-semibold">Key Features</h3>
+                      </div>
+                      <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                        {project.product.key_features.map((feature, idx) => (
+                          <li key={idx}>{feature}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
           </Card>
+        </TabsContent>
 
-          {/* Source Document Section */}
-          <Card className="bg-muted/30 border-dashed">
-            <CardContent className="p-6 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded bg-background border flex items-center justify-center">
-                  <FileText className="w-6 h-6 text-muted-foreground" />
-                </div>
-                <div>
-                  <h4 className="font-semibold">{project.documentFileName || "Source Document"}</h4>
-                  <p className="text-xs text-muted-foreground">The original document used to bootstrap this project</p>
-                </div>
-              </div>
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <Eye className="w-4 h-4 mr-2" />
-                    View Source
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>Document Viewer</DialogTitle>
-                  </DialogHeader>
-                  <DocumentViewer
-                    projectData={project}
-                    documentContent={project.documentContent || undefined}
-                    documentFileName={project.documentFileName || "Source Document"}
-                  />
-                </DialogContent>
-              </Dialog>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+        {/* Tools Tab */}
+        <TabsContent value="tools" className="space-y-6 mt-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {tools.map((tool) => (
+              <Card
+                key={tool.id}
+                className="cursor-pointer hover:shadow-lg hover:border-accent transition-all"
+                onClick={() => onNavigateToTool?.(tool.id)}
+              >
+                <CardHeader>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-accent/10">
+                      <tool.icon className="w-5 h-5 text-accent" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base">{tool.name}</CardTitle>
+                      <CardDescription className="text-xs">{tool.description}</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* Source Document Tab - Only if exists */}
+        {hasSourceDocument && (
+          <TabsContent value="source" className="space-y-6 mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Source Document</CardTitle>
+                <CardDescription>
+                  {project.pdf_source_name || "AI-generated content"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {project.pdf_source_text ? (
+                  <DocumentViewer content={project.pdf_source_text} />
+                ) : (
+                  <p className="text-muted-foreground">No source document available</p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+      </Tabs>
     </div>
   )
 }
