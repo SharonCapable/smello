@@ -8,6 +8,10 @@ export interface StoredProject extends ProjectData {
   documentContent?: string
   documentFileName?: string
 
+  // PDF source for projects created from PDFs
+  pdf_source_text?: string
+  pdf_source_name?: string
+
   // Ideas & Research
   generatedIdeas?: any[]
   selectedIdea?: any

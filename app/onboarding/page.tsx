@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 import { useUser } from "@clerk/nextjs"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { OnboardingFlow } from "@/components/onboarding-flow"
 import { Loader2 } from "lucide-react"
 
@@ -10,19 +10,23 @@ interface OnboardingData {
     name: string
     role: string
     usageType: "personal" | "team"
+    productDescription?: string
 }
 
-export default function OnboardingPage() {
+function OnboardingContent() {
     const { user, isLoaded, isSignedIn } = useUser()
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const isEditMode = searchParams.get("mode") === "edit"
+
     const [isChecking, setIsChecking] = useState(true)
+    const [initialData, setInitialData] = useState<Partial<OnboardingData>>({})
 
     useEffect(() => {
-        const checkOnboardingStatus = async () => {
+        const checkStatus = async () => {
             if (!isLoaded) return
 
             if (!isSignedIn) {
-                // Redirect to home if not authenticated
                 router.push("/")
                 return
             }
@@ -35,23 +39,32 @@ export default function OnboardingPage() {
                         if (res.ok) {
                             const userProfile = await res.json()
 
-                            if (userProfile?.onboardingCompleted) {
-                                // Already completed onboarding, redirect to app
+                            // If in edit mode, populate initial data
+                            if (isEditMode && userProfile) {
+                                setInitialData({
+                                    name: userProfile.name || user.fullName || "",
+                                    role: userProfile.role || "",
+                                    usageType: userProfile.selectedPath === "team" ? "team" : "personal"
+                                    // productDescription isn't stored in profile currently, but could be added if needed
+                                })
+                            }
+                            // Only redirect if NOT in edit mode and onboarding is already completed
+                            else if (userProfile?.onboardingCompleted) {
                                 router.push("/")
                                 return
                             }
                         }
                     }
                 } catch (error) {
-                    console.error("Error checking onboarding status:", error)
+                    console.error("Error checking status:", error)
                 }
 
                 setIsChecking(false)
             }
         }
 
-        checkOnboardingStatus()
-    }, [user, isLoaded, isSignedIn, router])
+        checkStatus()
+    }, [user, isLoaded, isSignedIn, router, isEditMode])
 
     const handleOnboardingComplete = async (data: OnboardingData) => {
         if (!user) return
@@ -60,7 +73,7 @@ export default function OnboardingPage() {
             const uid = user.id
 
             if (uid) {
-                // Update user profile with onboarding data via server-side API (firebase-admin)
+                // Update user profile with onboarding data via server-side API
                 await fetch(`/api/profile/${uid}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -75,10 +88,10 @@ export default function OnboardingPage() {
                     }),
                 })
 
-                // Clear any temporary onboarding data from localStorage
+                // Clear temp data
                 localStorage.removeItem("smello-onboarding-temp")
 
-                // Save permanent onboarding data so the home page knows state
+                // Save permanent onboarding data
                 const permanentData = {
                     name: data.name,
                     role: data.role,
@@ -86,8 +99,13 @@ export default function OnboardingPage() {
                 }
                 localStorage.setItem("smello-user-onboarding", JSON.stringify(permanentData))
 
-                // Redirect to home (app/page.tsx handles the dashboard view)
-                router.push("/")
+                // Redirect to home or show success message
+                if (isEditMode) {
+                    // Could show a toast here, but for now just redirect back
+                    router.push("/settings")
+                } else {
+                    router.push("/")
+                }
             }
         } catch (error) {
             console.error("Error completing onboarding:", error)
@@ -95,7 +113,11 @@ export default function OnboardingPage() {
     }
 
     const handleBack = () => {
-        router.push("/")
+        if (isEditMode) {
+            router.back()
+        } else {
+            router.push("/")
+        }
     }
 
     if (!isLoaded || isChecking) {
@@ -114,6 +136,23 @@ export default function OnboardingPage() {
             onComplete={handleOnboardingComplete}
             isAuthenticated={isSignedIn}
             onBack={handleBack}
+            initialData={initialData}
+            isEditMode={isEditMode}
         />
+    )
+}
+
+export default function OnboardingPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="text-center space-y-4">
+                    <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
+                    <p className="text-muted-foreground">Loading...</p>
+                </div>
+            </div>
+        }>
+            <OnboardingContent />
+        </Suspense>
     )
 }

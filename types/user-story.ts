@@ -31,6 +31,7 @@ export interface Product {
   target_audience?: string
   key_features?: string[]
   business_goals?: string[]
+  vision?: string
 }
 
 export interface ProjectData {

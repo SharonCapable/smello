@@ -41,15 +41,17 @@ interface OnboardingFlowProps {
     onComplete: (data: OnboardingData) => void
     isAuthenticated: boolean
     onBack: () => void
+    initialData?: Partial<OnboardingData>
+    isEditMode?: boolean
 }
 
-export function OnboardingFlow({ onComplete, isAuthenticated, onBack }: OnboardingFlowProps) {
+export function OnboardingFlow({ onComplete, isAuthenticated, onBack, initialData, isEditMode = false }: OnboardingFlowProps) {
     const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
     const [data, setData] = useState<OnboardingData>({
-        name: "",
-        role: "",
-        productDescription: "",
-        usageType: "personal"
+        name: initialData?.name || "",
+        role: initialData?.role || "",
+        productDescription: initialData?.productDescription || "",
+        usageType: initialData?.usageType || "personal"
     })
     const [isSigningIn, setIsSigningIn] = useState(false)
     const [isCompleting, setIsCompleting] = useState(false)
@@ -95,10 +97,16 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack }: Onboardi
             <Card className="max-w-xl w-full notched-card border shadow-2xl">
                 <CardHeader className="text-center pb-8">
                     <CardTitle className="text-3xl font-bold">
-                        {step === 1 ? "Welcome to SMELLO" : step === 2 ? "What's the problem you're solving?" : step === 3 ? "Choose Your Path" : isAuthenticated ? "Confirm Setup" : "Create Your Account"}
+                        {step === 1 ? (isEditMode ? "Update Your Profile" : "Welcome to SMELLO") :
+                            step === 2 ? "What's the problem you're solving?" :
+                                step === 3 ? "Choose Your Path" :
+                                    isAuthenticated ? (isEditMode ? "Confirm Updates" : "Confirm Setup") : "Create Your Account"}
                     </CardTitle>
                     <CardDescription className="text-lg">
-                        {step === 1 ? "Let's get to know you better" : step === 2 ? "Tell us the problem or outcome you want to achieve" : step === 3 ? "How do you plan to use Smello?" : isAuthenticated ? "You're almost there!" : "Secure your workspace to continue"}
+                        {step === 1 ? (isEditMode ? "Update your personal details" : "Let's get to know you better") :
+                            step === 2 ? "Tell us the problem or outcome you want to achieve" :
+                                step === 3 ? "How do you plan to use Smello?" :
+                                    isAuthenticated ? (isEditMode ? "Ready to save your changes?" : "You're almost there!") : "Secure your workspace to continue"}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-8">
@@ -247,7 +255,7 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack }: Onboardi
                                             </>
                                         ) : (
                                             <>
-                                                Enter Smello
+                                                {isEditMode ? "Save Changes" : "Enter Smello"}
                                                 <ArrowRight className="w-4 h-4 ml-2" />
                                             </>
                                         )}
