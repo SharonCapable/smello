@@ -25,7 +25,8 @@ import { ProjectPathSelector } from "@/components/project-path-selector"
 import { WorkflowHome } from "@/components/workflow-home"
 import { WorkflowStepper, type WorkflowPhase, getPhaseTools, getNextPhase } from "@/components/workflow-stepper"
 import { ProjectProgressManager } from "@/lib/project-progress"
-import { saveProject, type StoredProject } from "@/lib/storage"
+import { saveProject, setUserId, migrateToFirestore } from "@/lib/storage-hybrid"
+import type { StoredProject } from "@/lib/storage"
 import FeaturePrioritization from "@/app/feature-prioritization"
 import ResearchAgent from "@/app/research-agent"
 import type { InputMode, ProjectData } from "@/types/user-story"
@@ -176,6 +177,21 @@ export default function HomePage() {
     }
   }, [user, isLoaded, isSignedIn, appState])
 
+  // Sync user ID with storage layer and migrate projects if needed
+  useEffect(() => {
+    if (isSignedIn && user) {
+      setUserId(user.id)
+      // Attempt migration of local projects to Firestore
+      migrateToFirestore(user.id).then((count) => {
+        if (count > 0) {
+          console.log(`Migrated ${count} projects to Firestore`)
+        }
+      })
+    } else {
+      setUserId(null)
+    }
+  }, [isSignedIn, user])
+
   useEffect(() => {
     if (entryMode === 'pdf' && parsedPdfText && !showEditableExtract) {
       const lines = parsedPdfText.split('\n');
@@ -238,8 +254,8 @@ export default function HomePage() {
     }
   };
 
-  const handleComplete = (data: ProjectData) => {
-    const savedProject = saveProject(
+  const handleComplete = async (data: ProjectData) => {
+    const savedProject = await saveProject(
       data,
       parsedPdfText || undefined,
       uploadedFile?.name || undefined
@@ -268,7 +284,7 @@ export default function HomePage() {
     setAppState("mode-selection")
   }
 
-  const handleIdeaProjectCreate = (idea: any, mode: InputMode) => {
+  const handleIdeaProjectCreate = async (idea: any, mode: InputMode) => {
     const productData: ProjectData["product"] = {
       name: idea.title,
       description: idea.description,
@@ -278,17 +294,22 @@ export default function HomePage() {
       business_goals: [],
     }
 
-    const newProject: StoredProject = {
-      id: crypto.randomUUID(),
-      name: idea.title,
+    // saveProject handles ID creation internally if ID is not provided in data (it extracts from product name usually or generates new)
+    // But here we construct a StoredProject shape partially? No, saveProject takes ProjectData.
+    // We should pass ProjectData.
+    // Refactoring to match saveProject expectation more cleanly.
+
+    // The previous code created 'newProject' object manually including ID and timestamps.
+    // storage-hybrid's saveProject takes ProjectData and returns the stored object.
+    // So we should just construct ProjectData and let saveProject handle the rest.
+
+    const projectData: ProjectData = {
       product: productData,
-      epics: [],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      epics: []
     }
 
-    saveProject(newProject)
-    setCurrentProject(newProject)
+    const savedProject = await saveProject(projectData)
+    setCurrentProject(savedProject)
 
     if (isGuidedMode || appState === 'idea-generator') {
       setWorkflowPhase("foundation")
@@ -564,6 +585,7 @@ export default function HomePage() {
             <PRDGenerator
               project={currentProject}
               onBack={() => setAppState(currentProject ? "project-view" : "workflow-home")}
+              onProjectUpdate={handleProjectUpdate}
             />
           )}
 

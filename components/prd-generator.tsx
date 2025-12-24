@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation"
 interface PRDGeneratorProps {
     project?: StoredProject | null
     onBack: () => void
+    onProjectUpdate?: (project: StoredProject) => void
 }
 
 type PRDSectionType =
@@ -52,7 +53,7 @@ const SECTION_TYPES: { type: PRDSectionType; label: string; description: string 
     { type: "risks", label: "Risks & Mitigation", description: "What could go wrong?" },
 ]
 
-export function PRDGenerator({ project, onBack }: PRDGeneratorProps) {
+export function PRDGenerator({ project, onBack, onProjectUpdate }: PRDGeneratorProps) {
     const [sections, setSections] = useState<PRDSection[]>([])
     const [isGenerating, setIsGenerating] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
@@ -60,6 +61,44 @@ export function PRDGenerator({ project, onBack }: PRDGeneratorProps) {
     const [error, setError] = useState<string | null>(null)
     const [saveSuccess, setSaveSuccess] = useState(false)
     const [context, setContext] = useState(project ? `Product: ${project.product.name}\nDescription: ${project.product.description}\nTarget Audience: ${project.product.target_audience}` : "")
+
+    // Load existing PRD content if available
+    React.useEffect(() => {
+        if (project?.prd && typeof project.prd === 'object' && sections.length === 0) {
+            const loadedSections: PRDSection[] = []
+
+            const addSection = (type: PRDSectionType, content?: string) => {
+                if (content && typeof content === 'string') {
+                    const sectionDef = SECTION_TYPES.find(s => s.type === type)
+                    if (sectionDef) {
+                        loadedSections.push({
+                            id: crypto.randomUUID(),
+                            type,
+                            title: sectionDef.label,
+                            content,
+                            isPreview: true
+                        })
+                    }
+                }
+            }
+
+            // Map fields to sections
+            const prd = project.prd as any
+            addSection("problem_statement", prd.problemStatement)
+            addSection("goals_nongoals", prd.goalsNonGoals)
+            addSection("personas", prd.personas)
+            addSection("user_stories", prd.userStories)
+            addSection("user_flows", prd.userFlows)
+            addSection("functional_requirements", prd.functionalRequirements)
+            addSection("non_functional_requirements", prd.nonFunctionalRequirements)
+            addSection("analytics", prd.analytics)
+            addSection("risks", prd.risks)
+
+            if (loadedSections.length > 0) {
+                setSections(loadedSections)
+            }
+        }
+    }, [project])
 
     const handleAddSection = (type: PRDSectionType) => {
         const sectionDef = SECTION_TYPES.find(s => s.type === type)
@@ -184,7 +223,11 @@ export function PRDGenerator({ project, onBack }: PRDGeneratorProps) {
                 }
             })
 
-            await savePRDToProject(project.id, prdData)
+            const updatedProject = await savePRDToProject(project.id, prdData)
+
+            if (updatedProject && onProjectUpdate) {
+                onProjectUpdate(updatedProject)
+            }
             setSaveSuccess(true)
 
             // Clear success message after 3 seconds
