@@ -533,9 +533,31 @@ export default function HomePage() {
 
           {appState === "mode-selection" && <ModeSelector onModeSelect={handleModeSelect} />}
 
-          {appState === "ai-flow" && <AIGenerationFlow onComplete={handleComplete} onBack={handleBack} initialProduct={currentProject?.product} />}
+          {appState === "ai-flow" && <AIGenerationFlow
+            onComplete={handleComplete}
+            onBack={handleBack}
+            initialProduct={currentProject?.product || (extractedProductName || extractedDescription ? {
+              name: extractedProductName,
+              description: extractedDescription,
+              sector: "",
+              target_audience: "",
+              key_features: [],
+              business_goals: []
+            } : undefined)}
+          />}
 
-          {appState === "manual-flow" && <ManualInputFlow onComplete={handleComplete} onBack={handleBack} />}
+          {appState === "manual-flow" && <ManualInputFlow
+            onComplete={handleComplete}
+            onBack={handleBack}
+            initialProduct={currentProject?.product || (extractedProductName || extractedDescription ? {
+              name: extractedProductName,
+              description: extractedDescription,
+              sector: "",
+              target_audience: "",
+              key_features: [],
+              business_goals: []
+            } : undefined)}
+          />}
 
           {appState === "project-manager" && (
             <ProjectManager

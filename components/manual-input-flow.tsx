@@ -31,10 +31,11 @@ import type { Epic, Product, ProjectData, UserStory } from "@/types/user-story"
 interface ManualInputFlowProps {
   onComplete: (data: ProjectData) => void
   onBack: () => void
+  initialProduct?: Product
 }
 
-export function ManualInputFlow({ onComplete, onBack }: ManualInputFlowProps) {
-  const [product, setProduct] = useState<Product>({ name: "", description: "" })
+export function ManualInputFlow({ onComplete, onBack, initialProduct }: ManualInputFlowProps) {
+  const [product, setProduct] = useState<Product>(initialProduct || { name: "", description: "" })
   const [epics, setEpics] = useState<Epic[]>([])
   const [activeEpic, setActiveEpic] = useState<string | null>(null)
   const [isGeneratingEpics, setIsGeneratingEpics] = useState(false)
