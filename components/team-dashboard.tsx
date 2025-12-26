@@ -3,64 +3,58 @@
 import React, { useState } from "react"
 import { TeamsLayout } from "./teams/teams-layout"
 import { MyDashboard } from "./teams/my-dashboard"
+import { CollaborationHub } from "./teams/collaboration-hub"
+import { Task } from "./teams/task-table"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Lock, Users } from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card"
+import { ArrowLeft, Lock, Users, Plus } from "lucide-react"
 
 interface TeamDashboardProps {
     onBack: () => void
 }
 
+const INITIAL_TEAM_TASKS: Task[] = [
+    { id: "t1", values: { title: "Define Q1 Strategy", status: "In Progress", priority: "Critical", progress: 40, tags: ["Strategy", "Planning"] } },
+    { id: "t2", values: { title: "Security Audit - Auth Flow", status: "Done", priority: "High", progress: 100, tags: ["Security"] } },
+    { id: "t3", values: { title: "Team Capacity Planning", status: "To Do", priority: "Medium", progress: 0, tags: ["Ops"] } },
+]
+
 export function TeamDashboard({ onBack }: TeamDashboardProps) {
     const [activeTab, setActiveTab] = useState("personal-dashboard")
+    const [teamTasks, setTeamTasks] = useState<Task[]>(INITIAL_TEAM_TASKS)
+
+    const handlePromoteTask = (task: Task) => {
+        setTeamTasks(prev => [task, ...prev])
+        // Optionally show toast/notification
+    }
 
     const renderContent = () => {
         switch (activeTab) {
             case "personal-dashboard":
-                return <MyDashboard />
+                return <MyDashboard onPromoteTask={handlePromoteTask} />
             case "collaboration":
-                return (
-                    <div className="flex flex-col items-center justify-center py-20 text-center space-y-6 animate-fade-in">
-                        <div className="w-16 h-16 bg-accent/10 rounded-2xl flex items-center justify-center mx-auto">
-                            <Users className="w-8 h-8 text-accent" />
-                        </div>
-                        <div className="max-w-md space-y-2">
-                            <h2 className="text-2xl font-bold">Collaboration Hub</h2>
-                            <p className="text-muted-foreground">
-                                This is where your individual work becomes team work. Move tasks here to share them with your team.
-                            </p>
-                        </div>
-                        <Card className="max-w-md bg-card/50 border-dashed">
-                            <CardHeader>
-                                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                                    <Lock className="w-4 h-4 text-muted-foreground" />
-                                    Phase 2 Development
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <p className="text-xs text-muted-foreground">
-                                    The shared collaboration engine is currently being wired up to your organization's backend.
-                                </p>
-                            </CardContent>
-                        </Card>
-                    </div>
-                )
+                return <CollaborationHub tasks={teamTasks} setTasks={setTeamTasks} />
             case "sprints":
                 return (
-                    <div className="flex flex-col items-center justify-center py-20 text-center space-y-6 animate-fade-in">
+                    <div className="flex flex-col items-center justify-center py-40 text-center space-y-6 animate-fade-in max-w-2xl mx-auto">
                         <div className="w-16 h-16 bg-blue-500/10 rounded-2xl flex items-center justify-center mx-auto">
                             <Users className="w-8 h-8 text-blue-500" />
                         </div>
-                        <div className="max-w-md space-y-2">
-                            <h2 className="text-2xl font-bold">Sprint Board</h2>
-                            <p className="text-muted-foreground">
-                                Manage Scrum ceremonies or Kanban flows. Simple, visual, and fast.
+                        <div className="space-y-2">
+                            <h2 className="text-3xl font-bold tracking-tight">Sprint Management</h2>
+                            <p className="text-muted-foreground text-lg">
+                                Manage Scrum ceremonies or Kanban flows. Visualize your team's velocity and accelerate your delivery.
                             </p>
                         </div>
-                        <Button variant="outline" className="gap-2">
-                            <Lock className="w-4 h-4" />
-                            Configure First Sprint
-                        </Button>
+                        <div className="grid grid-cols-2 gap-4 w-full pt-4">
+                            <Button variant="outline" className="h-20 flex-col gap-1 border-dashed hover:border-accent/40 hover:bg-accent/5">
+                                <Plus className="w-5 h-5" />
+                                <span className="text-xs font-bold uppercase tracking-widest">New Sprint</span>
+                            </Button>
+                            <Button variant="outline" className="h-20 flex-col gap-1 border-dashed opacity-50 cursor-not-allowed">
+                                <Lock className="w-5 h-5" />
+                                <span className="text-xs font-bold uppercase tracking-widest">Analytics</span>
+                            </Button>
+                        </div>
                     </div>
                 )
             default:
