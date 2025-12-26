@@ -25,14 +25,17 @@ import { ProjectPathSelector } from "@/components/project-path-selector"
 import { WorkflowHome } from "@/components/workflow-home"
 import { WorkflowStepper, type WorkflowPhase, getPhaseTools, getNextPhase } from "@/components/workflow-stepper"
 import { ProjectProgressManager } from "@/lib/project-progress"
-import { saveProject, type StoredProject } from "@/lib/storage"
+import { saveProject, setUserId, migrateToFirestore } from "@/lib/storage-hybrid"
+import type { StoredProject } from "@/lib/storage"
 import FeaturePrioritization from "@/app/feature-prioritization"
 import ResearchAgent from "@/app/research-agent"
 import type { InputMode, ProjectData } from "@/types/user-story"
 import { useTheme } from "next-themes"
 import { SidebarNavigation } from "@/components/sidebar-navigation"
 // Import PDF utilities
-import { parsePdfDocument, validatePdfFile } from '@/lib/pdf-utils';
+// Import PDF utilities
+import { validatePdfFile } from '@/lib/pdf-utils';
+import { parsePdf } from '@/app/actions/parse-pdf';
 import { useUser } from "@clerk/nextjs"
 import { LandingPage } from "@/components/landing-page"
 import { OnboardingFlow } from "@/components/onboarding-flow"
@@ -151,6 +154,7 @@ export default function HomePage() {
                 }))
                 // Redirect to dashboard
                 if (isTransitionState) {
+                  alert(`Welcome back, ${data.name}! We found your existing account. Redirecting you to your dashboard.`);
                   if (data.selectedPath === "team") {
                     setAppState("team-dashboard")
                   } else {
@@ -175,6 +179,21 @@ export default function HomePage() {
       setIsCheckingProfile(false)
     }
   }, [user, isLoaded, isSignedIn, appState])
+
+  // Sync user ID with storage layer and migrate projects if needed
+  useEffect(() => {
+    if (isSignedIn && user) {
+      setUserId(user.id)
+      // Attempt migration of local projects to Firestore
+      migrateToFirestore(user.id).then((count) => {
+        if (count > 0) {
+          console.log(`Migrated ${count} projects to Firestore`)
+        }
+      })
+    } else {
+      setUserId(null)
+    }
+  }, [isSignedIn, user])
 
   useEffect(() => {
     if (entryMode === 'pdf' && parsedPdfText && !showEditableExtract) {
@@ -238,14 +257,14 @@ export default function HomePage() {
     }
   };
 
-  const handleComplete = (data: ProjectData) => {
-    const savedProject = saveProject(
+  const handleComplete = async (data: ProjectData) => {
+    const savedProject = await saveProject(
       data,
       parsedPdfText || undefined,
       uploadedFile?.name || undefined
     )
     setCurrentProject(savedProject)
-    setAppState("project-manager")
+    setAppState("project-view")
     setTimeout(() => {
       alert(`Project "${savedProject.name}" has been saved successfully! You can find it in your projects list.`)
     }, 100)
@@ -268,7 +287,7 @@ export default function HomePage() {
     setAppState("mode-selection")
   }
 
-  const handleIdeaProjectCreate = (idea: any, mode: InputMode) => {
+  const handleIdeaProjectCreate = async (idea: any, mode: InputMode) => {
     const productData: ProjectData["product"] = {
       name: idea.title,
       description: idea.description,
@@ -278,17 +297,24 @@ export default function HomePage() {
       business_goals: [],
     }
 
-    const newProject: StoredProject = {
-      id: crypto.randomUUID(),
-      name: idea.title,
+    // saveProject handles ID creation internally if ID is not provided in data (it extracts from product name usually or generates new)
+    // But here we construct a StoredProject shape partially? No, saveProject takes ProjectData.
+    // We should pass ProjectData.
+    // Refactoring to match saveProject expectation more cleanly.
+
+    // The previous code created 'newProject' object manually including ID and timestamps.
+    // storage-hybrid's saveProject takes ProjectData and returns the stored object.
+    // So we should just construct ProjectData and let saveProject handle the rest.
+
+    const projectData: ProjectData = {
       product: productData,
       epics: [],
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
     }
 
-    saveProject(newProject)
-    setCurrentProject(newProject)
+    const savedProject = await saveProject(projectData)
+    setCurrentProject(savedProject)
 
     if (isGuidedMode || appState === 'idea-generator') {
       setWorkflowPhase("foundation")
@@ -315,9 +341,18 @@ export default function HomePage() {
 
     try {
       console.log('Starting PDF parsing for:', file.name);
-      const textContent = await parsePdfDocument(file);
-      console.log('PDF parsing successful, text length:', textContent.length);
-      setParsedPdfText(textContent);
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const result = await parsePdf(formData);
+
+      if (result.success && result.text) {
+        console.log('PDF parsing successful, text length:', result.text.length);
+        setParsedPdfText(result.text);
+      } else {
+        throw new Error(result.error || 'Failed to parse PDF');
+      }
     } catch (e) {
       console.error('PDF parsing error:', e);
       const errorMessage = e instanceof Error ? e.message : 'Could not parse PDF. Try a different file.';
@@ -498,9 +533,31 @@ export default function HomePage() {
 
           {appState === "mode-selection" && <ModeSelector onModeSelect={handleModeSelect} />}
 
-          {appState === "ai-flow" && <AIGenerationFlow onComplete={handleComplete} onBack={handleBack} initialProduct={currentProject?.product} />}
+          {appState === "ai-flow" && <AIGenerationFlow
+            onComplete={handleComplete}
+            onBack={handleBack}
+            initialProduct={currentProject?.product || (extractedProductName || extractedDescription ? {
+              name: extractedProductName,
+              description: extractedDescription,
+              sector: "",
+              target_audience: "",
+              key_features: [],
+              business_goals: []
+            } : undefined)}
+          />}
 
-          {appState === "manual-flow" && <ManualInputFlow onComplete={handleComplete} onBack={handleBack} />}
+          {appState === "manual-flow" && <ManualInputFlow
+            onComplete={handleComplete}
+            onBack={handleBack}
+            initialProduct={currentProject?.product || (extractedProductName || extractedDescription ? {
+              name: extractedProductName,
+              description: extractedDescription,
+              sector: "",
+              target_audience: "",
+              key_features: [],
+              business_goals: []
+            } : undefined)}
+          />}
 
           {appState === "project-manager" && (
             <ProjectManager
@@ -515,6 +572,7 @@ export default function HomePage() {
               project={currentProject}
               onBack={() => setAppState("project-manager")}
               onEdit={handleEditProject}
+              onNavigateToTool={(tool) => setAppState(tool as AppState)}
             />
           )}
 
@@ -563,6 +621,7 @@ export default function HomePage() {
             <PRDGenerator
               project={currentProject}
               onBack={() => setAppState(currentProject ? "project-view" : "workflow-home")}
+              onProjectUpdate={handleProjectUpdate}
             />
           )}
 

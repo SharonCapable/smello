@@ -1,4 +1,5 @@
 import { updateProject, type HybridStoredProject } from "./storage-hybrid"
+import type { StoredProject } from "./storage"
 
 /**
  * Centralized manager for project artifacts
@@ -72,17 +73,19 @@ export async function saveIdeasToProject(
 export async function savePRDToProject(
   projectId: string,
   prdData: Partial<ProjectArtifacts['prd']>
-): Promise<void> {
+): Promise<StoredProject | null> {
   // Get current project to merge PRD data
   const currentProject = await import('./storage-hybrid').then(m => m.loadProject(projectId))
 
-  const existingPRD = currentProject?.prd || {}
+  const rawPRD = currentProject?.prd || {}
+  const existingPRD = typeof rawPRD === 'string' ? { fullDocument: rawPRD } : rawPRD
+
   const updatedPRD = {
     ...existingPRD,
     ...prdData
   }
 
-  await updateProject(projectId, {
+  return await updateProject(projectId, {
     prd: updatedPRD,
   } as any)
 }

@@ -53,7 +53,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import type { Epic, UserStory } from "@/types/user-story"
 import type { StoredProject } from "@/lib/storage"
-import { saveProject } from "@/lib/storage"
+import { updateProject } from "@/lib/storage-hybrid"
 import { generateUserStoriesForEpic, generateAdditionalUserStories, type GenerationOptions } from "@/lib/ai-generation"
 
 interface ProjectManagementViewProps {
@@ -72,14 +72,24 @@ export function ProjectManagementView({ project, onBack, onProjectUpdate, onNavi
   const [showNewEpicDialog, setShowNewEpicDialog] = useState(false)
   const { toast } = useToast()
 
-  const handleSaveProject = () => {
-    const updatedProject = saveProject(currentProject)
-    setCurrentProject(updatedProject)
-    onProjectUpdate(updatedProject)
-    toast({
-      title: "Project Saved",
-      description: "Your changes have been saved successfully.",
-    })
+  const handleSaveProject = async () => {
+    try {
+      const updatedProject = await updateProject(currentProject.id, currentProject)
+      if (updatedProject) {
+        setCurrentProject(updatedProject)
+        onProjectUpdate(updatedProject)
+        toast({
+          title: "Project Saved",
+          description: "Your changes have been saved successfully.",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Save Failed",
+        description: "Failed to save project changes.",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleAddEpic = () => {

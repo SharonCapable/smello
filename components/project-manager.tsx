@@ -26,7 +26,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { FolderOpen, Plus, Search, Calendar, FileText, Trash2, Download, Sparkles, Edit3 } from "lucide-react"
-import { getStoredProjects, deleteProject, type StoredProject } from "@/lib/storage"
+import { getStoredProjects, deleteProject } from "@/lib/storage-hybrid"
+import type { StoredProject } from "@/lib/storage"
 import { EnhancedExportDialog } from "@/components/enhanced-export-dialog"
 import type { InputMode } from "@/types/user-story"
 
@@ -41,7 +42,11 @@ export function ProjectManager({ onCreateNew, onLoadProject, onModeSelect }: Pro
   const [searchTerm, setSearchTerm] = useState("")
 
   useEffect(() => {
-    setProjects(getStoredProjects())
+    const loadProjects = async () => {
+      const stored = await getStoredProjects()
+      setProjects(stored)
+    }
+    loadProjects()
   }, [])
 
   const filteredProjects = projects.filter(
@@ -50,9 +55,10 @@ export function ProjectManager({ onCreateNew, onLoadProject, onModeSelect }: Pro
       project.product.description.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
-  const handleDeleteProject = (projectId: string) => {
-    deleteProject(projectId)
-    setProjects(getStoredProjects())
+  const handleDeleteProject = async (projectId: string) => {
+    await deleteProject(projectId)
+    const stored = await getStoredProjects()
+    setProjects(stored)
   }
 
   const handleLoadProject = (project: StoredProject) => {

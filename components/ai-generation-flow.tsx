@@ -71,6 +71,21 @@ export function AIGenerationFlow({ onComplete, onBack, initialProduct }: AIGener
     return true
   }
 
+  const handleCreateProject = () => {
+    if (!product.name.trim() || !product.description.trim()) return
+
+    const projectData: ProjectData = {
+      product,
+      epics: [],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+
+    // Set step to complete so we don't return here if data is kept
+    setCurrentStep("complete")
+    onComplete(projectData)
+  }
+
   const handleProductSubmit = async () => {
     if (!product.name.trim() || !product.description.trim()) return
     if (!checkApiKey()) return
@@ -350,7 +365,11 @@ export function AIGenerationFlow({ onComplete, onBack, initialProduct }: AIGener
             <Separator />
 
             <div className="flex gap-3">
-              <Button onClick={handleProductSubmit} disabled={!product.name.trim() || !product.description.trim()}>
+              <Button onClick={handleCreateProject} disabled={!product.name.trim() || !product.description.trim()} variant="default">
+                <Plus className="w-4 h-4 mr-2" />
+                Create Project
+              </Button>
+              <Button onClick={handleProductSubmit} disabled={!product.name.trim() || !product.description.trim()} variant="secondary">
                 <Sparkles className="w-4 h-4 mr-2" />
                 Generate Epics
               </Button>
