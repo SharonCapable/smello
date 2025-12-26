@@ -6,7 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Search, Sparkles, Plus, Trash2, Shield, Swords } from "lucide-react"
+import { Search, Sparkles, Plus, Trash2, Shield, Swords, History, Clock, RotateCcw } from "lucide-react"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { ApiKeyManager } from "@/lib/api-key-manager"
 import { ApiKeySetup } from "@/components/api-key-setup"
 import { MarkdownRenderer } from "@/components/markdown-renderer"
@@ -26,6 +28,44 @@ export function CompetitiveIntelligence({ project, onBack }: CompetitiveIntellig
     const [isGenerating, setIsGenerating] = useState(false)
     const [showApiKeySetup, setShowApiKeySetup] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [history, setHistory] = useState<Array<{
+        id: string
+        date: string
+        type: "swot" | "matrix"
+        content: string
+        competitors: string[]
+        context: string
+    }>>([])
+    const [showHistory, setShowHistory] = useState(false)
+
+    // Load history on mount
+    useState(() => {
+        if (typeof window !== "undefined") {
+            const savedKey = project ? `smello-ci-history-${project.id}` : "smello-ci-history-global"
+            const saved = localStorage.getItem(savedKey)
+            if (saved) {
+                try {
+                    setHistory(JSON.parse(saved))
+                } catch (e) {
+                    console.error("Failed to parse history", e)
+                }
+            }
+        }
+    })
+
+    const saveHistory = (newItem: any) => {
+        const updated = [newItem, ...history]
+        setHistory(updated)
+        if (typeof window !== "undefined") {
+            const savedKey = project ? `smello-ci-history-${project.id}` : "smello-ci-history-global"
+            localStorage.setItem(savedKey, JSON.stringify(updated))
+        }
+    }
+
+    const cleanContent = (text: string) => {
+        // Remove markdown code blocks if the LLM wrapped it
+        return text.replace(/^```markdown\n/, '').replace(/^```\n/, '').replace(/\n```$/, '')
+    }
 
     const handleAddCompetitor = () => {
         if (newCompetitor.trim()) {
@@ -40,6 +80,14 @@ export function CompetitiveIntelligence({ project, onBack }: CompetitiveIntellig
 
     const handleGenerate = async (type: "swot" | "matrix") => {
         // Delegate key selection and quota enforcement to server `/api/generate`.
+
+        if (competitors.length === 0) {
+            // Check if user wants to proceed without competitors (using AI to guess)
+            if (!confirm("No competitors added. Do you want the AI to identify potential competitors and proceed?")) {
+                return
+            }
+        }
+
         setIsGenerating(true)
         setError(null)
 
@@ -90,8 +138,18 @@ export function CompetitiveIntelligence({ project, onBack }: CompetitiveIntellig
             const content = data.candidates?.[0]?.content?.parts?.[0]?.text
 
             if (content) {
-                if (type === "swot") setSwot(content)
-                else setFeatureMatrix(content)
+                const cleaned = cleanContent(content)
+                if (type === "swot") setSwot(cleaned)
+                else setFeatureMatrix(cleaned)
+
+                saveHistory({
+                    id: Date.now().toString(),
+                    date: new Date().toISOString(),
+                    type,
+                    content: cleaned,
+                    competitors: [...competitors],
+                    context
+                })
             }
 
         } catch (error) {
@@ -120,7 +178,52 @@ export function CompetitiveIntelligence({ project, onBack }: CompetitiveIntellig
                         Analyze competitors and generate SWOT & feature matrices.
                     </p>
                 </div>
-                <Button variant="outline" onClick={onBack}>Back</Button>
+                <div className="flex gap-2">
+                    <Sheet open={showHistory} onOpenChange={setShowHistory}>
+                        <SheetTrigger asChild>
+                            <Button variant="outline" size="sm">
+                                <History className="w-4 h-4 mr-2" />
+                                History
+                            </Button>
+                        </SheetTrigger>
+                        <SheetContent>
+                            <SheetHeader>
+                                <SheetTitle>Analysis History</SheetTitle>
+                            </SheetHeader>
+                            <ScrollArea className="h-[calc(100vh-100px)] mt-4">
+                                <div className="space-y-4">
+                                    {history.length === 0 ? (
+                                        <p className="text-muted-foreground text-center py-4">No history yet.</p>
+                                    ) : (
+                                        history.map((item) => (
+                                            <Card key={item.id} className="cursor-pointer hover:bg-muted/50" onClick={() => {
+                                                if (item.type === "swot") setSwot(item.content)
+                                                else setFeatureMatrix(item.content)
+                                                setContext(item.context)
+                                                setCompetitors(item.competitors)
+                                                setShowHistory(false)
+                                            }}>
+                                                <CardHeader className="p-4">
+                                                    <div className="flex justify-between items-start">
+                                                        <div className="font-semibold text-sm capitalize flex items-center gap-2">
+                                                            {item.type === "swot" ? <Shield className="w-3 h-3" /> : <Swords className="w-3 h-3" />}
+                                                            {item.type === "matrix" ? "Feature Matrix" : "SWOT Analysis"}
+                                                        </div>
+                                                        <span className="text-xs text-muted-foreground">{new Date(item.date).toLocaleDateString()}</span>
+                                                    </div>
+                                                    <CardDescription className="line-clamp-2 text-xs mt-1">
+                                                        {item.competitors.length} Competitors: {item.competitors.join(", ")}
+                                                    </CardDescription>
+                                                </CardHeader>
+                                            </Card>
+                                        ))
+                                    )}
+                                </div>
+                            </ScrollArea>
+                        </SheetContent>
+                    </Sheet>
+                    <Button variant="outline" onClick={onBack}>Back</Button>
+                </div>
             </div>
 
             <div className="grid md:grid-cols-[300px_1fr] gap-6">
@@ -197,7 +300,7 @@ export function CompetitiveIntelligence({ project, onBack }: CompetitiveIntellig
                             </div>
                             {swot ? (
                                 <Card>
-                                    <CardContent className="pt-6">
+                                    <CardContent className="pt-6 overflow-x-auto">
                                         <MarkdownRenderer content={swot} />
                                     </CardContent>
                                 </Card>
@@ -219,7 +322,7 @@ export function CompetitiveIntelligence({ project, onBack }: CompetitiveIntellig
                             </div>
                             {featureMatrix ? (
                                 <Card>
-                                    <CardContent className="pt-6">
+                                    <CardContent className="pt-6 overflow-x-auto">
                                         <MarkdownRenderer content={featureMatrix} />
                                     </CardContent>
                                 </Card>
@@ -234,6 +337,6 @@ export function CompetitiveIntelligence({ project, onBack }: CompetitiveIntellig
                     </Tabs>
                 </div>
             </div>
-        </div>
+        </div >
     )
 }
