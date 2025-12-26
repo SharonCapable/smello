@@ -28,7 +28,8 @@ import {
     Tag,
     User as UserIcon,
     GripVertical,
-    Trash2
+    Trash2,
+    Share2
 } from "lucide-react"
 import { Slider } from "@/components/ui/slider"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -62,12 +63,13 @@ interface TaskTableProps {
     onUpdateTask: (taskId: string, fieldId: string, value: any) => void
     onAddTask: () => void
     onDeleteTask?: (taskId: string) => void
+    onPromoteTask?: (taskId: string) => void
 }
 
 const STATUS_OPTIONS = ["Backlog", "To Do", "In Progress", "Review", "Blocked", "Done"]
 const PRIORITY_OPTIONS = ["Low", "Medium", "High", "Critical"]
 
-export function TaskTable({ tasks, columns, onUpdateTask, onAddTask, onDeleteTask }: TaskTableProps) {
+export function TaskTable({ tasks, columns, onUpdateTask, onAddTask, onDeleteTask, onPromoteTask }: TaskTableProps) {
     const [hoveredRow, setHoveredRow] = useState<string | null>(null)
 
     const renderCell = (task: Task, column: Column) => {
@@ -109,8 +111,8 @@ export function TaskTable({ tasks, columns, onUpdateTask, onAddTask, onDeleteTas
                         <PopoverTrigger asChild>
                             <Button variant="ghost" className="h-8 justify-start font-normal hover:bg-muted/50 w-full px-2">
                                 <span className={`text-xs font-medium ${value === "Critical" ? "text-red-600" :
-                                        value === "High" ? "text-red-500" :
-                                            value === "Medium" ? "text-yellow-600" : "text-muted-foreground"
+                                    value === "High" ? "text-red-500" :
+                                        value === "Medium" ? "text-yellow-600" : "text-muted-foreground"
                                     }`}>
                                     {value || "Medium"}
                                 </span>
@@ -233,6 +235,12 @@ export function TaskTable({ tasks, columns, onUpdateTask, onAddTask, onDeleteTas
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end" className="w-48">
+                                        <DropdownMenuItem
+                                            className="gap-2"
+                                            onClick={() => onPromoteTask?.(task.id)}
+                                        >
+                                            <Share2 className="w-4 h-4" /> Move to Collaboration
+                                        </DropdownMenuItem>
                                         <DropdownMenuItem className="gap-2">
                                             <Plus className="w-4 h-4" /> Add subtask
                                         </DropdownMenuItem>

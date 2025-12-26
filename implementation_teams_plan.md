@@ -32,9 +32,11 @@
   - Adding custom columns.
 - [ ] **Personal Task Management**: View and manage tasks that are purely personal or assigned to the user.
 
-## 4. Phase 3: Collaboration Hub
-- [ ] **Promote to Team**: Logic to move a personal task into the Team/Org context.
-- [ ] **Team Views**: Shared task list filtered by team.
+## 4. Phase 3: Collaboration Hub (Status: ✅ Completed)
+- [x] Create shared task pool view in `CollaborationHub`.
+- [x] Implement "Promote to Collaboration" logic in `MyDashboard`.
+- [x] Basic Team Stats (Velocity placeholder, Active members).
+- [x] Activity Log & Discussion visual structure.
 
 ## 5. Phase 4: Sprint Management
 - [ ] **Sprint Creator**: Modal/Form to define sprint duration and recurring rules.

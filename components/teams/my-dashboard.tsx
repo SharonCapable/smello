@@ -40,7 +40,11 @@ const INITIAL_TASKS: Task[] = [
     { id: "4", values: { title: "Integrate Google Calendar", status: "Backlog", priority: "Medium", progress: 0, tags: ["Integration"] } },
 ]
 
-export function MyDashboard() {
+interface MyDashboardProps {
+    onPromoteTask?: (task: Task) => void
+}
+
+export function MyDashboard({ onPromoteTask }: MyDashboardProps) {
     const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS)
     const [searchQuery, setSearchQuery] = useState("")
     const [lastSynced, setLastSynced] = useState(new Date())
@@ -64,6 +68,14 @@ export function MyDashboard() {
     const handleDeleteTask = (taskId: string) => {
         setTasks(prev => prev.filter(t => t.id !== taskId))
         setLastSynced(new Date())
+    }
+
+    const handleInternalPromoteTask = (taskId: string) => {
+        const task = tasks.find(t => t.id === taskId)
+        if (task && onPromoteTask) {
+            onPromoteTask(task)
+            handleDeleteTask(taskId) // Remove from personal dashboard after promoting
+        }
     }
 
     return (
@@ -170,6 +182,7 @@ export function MyDashboard() {
                     onUpdateTask={handleUpdateTask}
                     onAddTask={handleAddTask}
                     onDeleteTask={handleDeleteTask}
+                    onPromoteTask={handleInternalPromoteTask}
                 />
             </div>
 
