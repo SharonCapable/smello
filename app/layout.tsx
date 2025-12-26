@@ -7,7 +7,10 @@ import { Suspense } from "react"
 import { ThemeProvider } from "@/components/theme-provider"
 import "./globals.css"
 
+import { FirebaseAuthBridge } from "@/components/firebase-auth-bridge"
+
 const notoSans = Noto_Sans({ subsets: ["latin"], variable: "--font-noto-sans", weight: ["400", "500", "700"] })
+
 
 export const metadata: Metadata = {
   title: "SMELLO Product Management Toolkit",
@@ -53,6 +56,7 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
+            <FirebaseAuthBridge />
             <Suspense fallback={null}>{children}</Suspense>
           </ThemeProvider>
         </body>
