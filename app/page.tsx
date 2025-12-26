@@ -33,7 +33,9 @@ import type { InputMode, ProjectData } from "@/types/user-story"
 import { useTheme } from "next-themes"
 import { SidebarNavigation } from "@/components/sidebar-navigation"
 // Import PDF utilities
-import { parsePdfDocument, validatePdfFile } from '@/lib/pdf-utils';
+// Import PDF utilities
+import { validatePdfFile } from '@/lib/pdf-utils';
+import { parsePdf } from '@/app/actions/parse-pdf';
 import { useUser } from "@clerk/nextjs"
 import { LandingPage } from "@/components/landing-page"
 import { OnboardingFlow } from "@/components/onboarding-flow"
@@ -152,6 +154,7 @@ export default function HomePage() {
                 }))
                 // Redirect to dashboard
                 if (isTransitionState) {
+                  alert(`Welcome back, ${data.name}! We found your existing account. Redirecting you to your dashboard.`);
                   if (data.selectedPath === "team") {
                     setAppState("team-dashboard")
                   } else {
@@ -261,7 +264,7 @@ export default function HomePage() {
       uploadedFile?.name || undefined
     )
     setCurrentProject(savedProject)
-    setAppState("project-manager")
+    setAppState("project-view")
     setTimeout(() => {
       alert(`Project "${savedProject.name}" has been saved successfully! You can find it in your projects list.`)
     }, 100)
@@ -305,7 +308,9 @@ export default function HomePage() {
 
     const projectData: ProjectData = {
       product: productData,
-      epics: []
+      epics: [],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     }
 
     const savedProject = await saveProject(projectData)
@@ -336,9 +341,18 @@ export default function HomePage() {
 
     try {
       console.log('Starting PDF parsing for:', file.name);
-      const textContent = await parsePdfDocument(file);
-      console.log('PDF parsing successful, text length:', textContent.length);
-      setParsedPdfText(textContent);
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const result = await parsePdf(formData);
+
+      if (result.success && result.text) {
+        console.log('PDF parsing successful, text length:', result.text.length);
+        setParsedPdfText(result.text);
+      } else {
+        throw new Error(result.error || 'Failed to parse PDF');
+      }
     } catch (e) {
       console.error('PDF parsing error:', e);
       const errorMessage = e instanceof Error ? e.message : 'Could not parse PDF. Try a different file.';

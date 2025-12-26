@@ -67,6 +67,7 @@ export function ManualInputFlow({ onComplete, onBack }: ManualInputFlowProps) {
 
     const newStory: UserStory = {
       id: `${epicId}-US${epic.user_stories.length + 1}`,
+      title: "",
       description: "",
       acceptance_criteria: [""],
       edge_cases: [""],
@@ -153,7 +154,7 @@ export function ManualInputFlow({ onComplete, onBack }: ManualInputFlowProps) {
 
   const generateEpicsWithAI = async () => {
     if (!product.name || !product.description) return
-    
+
     setIsGeneratingEpics(true)
     try {
       // Mock AI generation - replace with actual AI call
@@ -164,13 +165,13 @@ export function ManualInputFlow({ onComplete, onBack }: ManualInputFlowProps) {
         "Integration & API",
         "Support & Documentation"
       ]
-      
+
       const newEpics: Epic[] = mockEpics.map((title, index) => ({
         id: `E${epics.length + index + 1}`,
         title,
         user_stories: []
       }))
-      
+
       setEpics([...epics, ...newEpics])
       if (newEpics.length > 0) {
         setActiveEpic(newEpics[0].id)
@@ -185,7 +186,7 @@ export function ManualInputFlow({ onComplete, onBack }: ManualInputFlowProps) {
   const generateStoriesWithAI = async (epicId: string) => {
     const epic = epics.find(e => e.id === epicId)
     if (!epic || !epic.title) return
-    
+
     setIsGeneratingStories(epicId)
     try {
       // Mock AI generation - replace with actual AI call
@@ -221,13 +222,13 @@ export function ManualInputFlow({ onComplete, onBack }: ManualInputFlowProps) {
           }
         }
       ]
-      
-      const updatedEpics = epics.map(e => 
-        e.id === epicId 
+
+      const updatedEpics = epics.map(e =>
+        e.id === epicId
           ? { ...e, user_stories: [...e.user_stories, ...mockStories] }
           : e
       )
-      
+
       setEpics(updatedEpics)
     } catch (error) {
       console.error('Failed to generate stories:', error)
@@ -237,7 +238,7 @@ export function ManualInputFlow({ onComplete, onBack }: ManualInputFlowProps) {
   }
 
   const handleSave = () => {
-    if (!product.name.trim() || !product.description.trim() || epics.length === 0) return
+    if (!product.name.trim() || !product.description.trim()) return
 
     const projectData: ProjectData = {
       product,
@@ -249,7 +250,7 @@ export function ManualInputFlow({ onComplete, onBack }: ManualInputFlowProps) {
     onComplete(projectData)
   }
 
-  const canSave = product.name.trim() && product.description.trim() && epics.length > 0
+  const canSave = product.name.trim() && product.description.trim()
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -343,9 +344,9 @@ export function ManualInputFlow({ onComplete, onBack }: ManualInputFlowProps) {
                   <Plus className="w-4 h-4 mr-2" />
                   Add Epic
                 </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={generateEpicsWithAI} 
+                <Button
+                  variant="outline"
+                  onClick={generateEpicsWithAI}
                   disabled={!product.name || !product.description || isGeneratingEpics}
                   className="flex-1 bg-transparent"
                 >
@@ -487,8 +488,8 @@ function EpicEditor({
                 <Plus className="w-4 h-4 mr-2" />
                 Add Story
               </Button>
-              <Button 
-                onClick={onGenerateStories} 
+              <Button
+                onClick={onGenerateStories}
                 size="sm"
                 disabled={!epic.title || isGeneratingStories}
               >
