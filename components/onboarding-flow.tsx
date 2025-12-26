@@ -13,7 +13,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { User, Briefcase, ArrowRight, CheckCircle2, Lock, LogIn, Loader2 } from "lucide-react"
+import { User, Briefcase, ArrowRight, CheckCircle2, Lock, LogIn, Loader2, Building2, Users } from "lucide-react"
 import { useClerk } from "@clerk/nextjs"
 
 const PREDEFINED_ROLES = [
@@ -35,6 +35,8 @@ interface OnboardingData {
     role: string
     productDescription?: string
     usageType: "personal" | "team"
+    organizationName?: string
+    teamName?: string
 }
 
 interface OnboardingFlowProps {
@@ -46,12 +48,14 @@ interface OnboardingFlowProps {
 }
 
 export function OnboardingFlow({ onComplete, isAuthenticated, onBack, initialData, isEditMode = false }: OnboardingFlowProps) {
-    const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
+    const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1)
     const [data, setData] = useState<OnboardingData>({
         name: initialData?.name || "",
         role: initialData?.role || "",
         productDescription: initialData?.productDescription || "",
-        usageType: initialData?.usageType || "personal"
+        usageType: initialData?.usageType || "personal",
+        organizationName: initialData?.organizationName || "",
+        teamName: initialData?.teamName || ""
     })
     const [isSigningIn, setIsSigningIn] = useState(false)
     const [isCompleting, setIsCompleting] = useState(false)
@@ -73,21 +77,23 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack, initialDat
             setStep(3)
         } else if (step === 3) {
             setStep(4)
+        } else if (step === 4) {
+            if (data.usageType === "team") {
+                setStep(5)
+            } else {
+                // handleFinishSetup will be called via button
+            }
         }
     }
 
     const handleSignIn = async () => {
         setIsSigningIn(true)
-        // Save onboarding state to localStorage TEMP so we can retrieve it after redirect
         localStorage.setItem("smello-onboarding-temp", JSON.stringify(data))
-
-        // Trigger Clerk Sign In
         openSignIn({ forceRedirectUrl: "/onboarding" })
     }
 
     const handleFinishSetup = async () => {
         setIsCompleting(true)
-        // Simulate adequate delay for UX
         await new Promise(r => setTimeout(r, 800))
         onComplete(data)
     }
@@ -100,13 +106,15 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack, initialDat
                         {step === 1 ? (isEditMode ? "Update Your Profile" : "Welcome to SMELLO") :
                             step === 2 ? "What's the problem you're solving?" :
                                 step === 3 ? "Choose Your Path" :
-                                    isAuthenticated ? (isEditMode ? "Confirm Updates" : "Confirm Setup") : "Create Your Account"}
+                                    step === 4 ? (isAuthenticated ? (isEditMode ? "Confirm Updates" : "Identity Verified") : "Create Your Account") :
+                                        "Setup Your Team"}
                     </CardTitle>
                     <CardDescription className="text-lg">
                         {step === 1 ? (isEditMode ? "Update your personal details" : "Let's get to know you better") :
                             step === 2 ? "Tell us the problem or outcome you want to achieve" :
                                 step === 3 ? "How do you plan to use Smello?" :
-                                    isAuthenticated ? (isEditMode ? "Ready to save your changes?" : "You're almost there!") : "Secure your workspace to continue"}
+                                    step === 4 ? (isAuthenticated ? (isEditMode ? "Ready to save your changes?" : "You're authenticated!") : "Secure your workspace to continue") :
+                                        "Define your organization and team workspace"}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-8">
@@ -245,7 +253,7 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack, initialDat
                                     <Button
                                         size="lg"
                                         className="w-full h-12 text-base"
-                                        onClick={handleFinishSetup}
+                                        onClick={data.usageType === "team" ? handleNext : handleFinishSetup}
                                         disabled={isCompleting}
                                     >
                                         {isCompleting ? (
@@ -255,7 +263,7 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack, initialDat
                                             </>
                                         ) : (
                                             <>
-                                                {isEditMode ? "Save Changes" : "Enter Smello"}
+                                                {data.usageType === "team" ? "Continue to Team Setup" : (isEditMode ? "Save Changes" : "Enter Smello")}
                                                 <ArrowRight className="w-4 h-4 ml-2" />
                                             </>
                                         )}
@@ -302,6 +310,56 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack, initialDat
                         </div>
                     )}
 
+                    {step === 5 && (
+                        <div className="space-y-6 animate-fade-in-up">
+                            <div className="space-y-2">
+                                <Label htmlFor="org" className="text-base">Organization Name</Label>
+                                <div className="relative">
+                                    <Building2 className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
+                                    <Input
+                                        id="org"
+                                        placeholder="e.g. Acme Corp"
+                                        className="pl-10 h-12 text-lg"
+                                        value={data.organizationName}
+                                        onChange={(e) => setData({ ...data, organizationName: e.target.value })}
+                                        autoFocus
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="team" className="text-base">Your Team Name</Label>
+                                <div className="relative">
+                                    <Users className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
+                                    <Input
+                                        id="team"
+                                        placeholder="e.g. Product Team B"
+                                        className="pl-10 h-12 text-lg"
+                                        value={data.teamName}
+                                        onChange={(e) => setData({ ...data, teamName: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+                            <Button
+                                size="lg"
+                                className="w-full h-12 text-base mt-4"
+                                onClick={handleFinishSetup}
+                                disabled={isCompleting || !data.organizationName || !data.teamName}
+                            >
+                                {isCompleting ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                        Building your workspace...
+                                    </>
+                                ) : (
+                                    <>
+                                        Finish Setup
+                                        <ArrowRight className="w-4 h-4 ml-2" />
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                    )}
+
                     <div className="pt-4 flex justify-between items-center">
                         <Button
                             variant="ghost"
@@ -335,6 +393,9 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack, initialDat
                 <div className={`h-1.5 w-12 rounded-full transition-all ${step >= 2 ? "bg-accent" : "bg-muted"}`} />
                 <div className={`h-1.5 w-12 rounded-full transition-all ${step >= 3 ? "bg-accent" : "bg-muted"}`} />
                 <div className={`h-1.5 w-12 rounded-full transition-all ${step >= 4 ? "bg-accent" : "bg-muted"}`} />
+                {data.usageType === "team" && (
+                    <div className={`h-1.5 w-12 rounded-full transition-all ${step >= 5 ? "bg-accent" : "bg-muted"}`} />
+                )}
             </div>
         </div>
     )

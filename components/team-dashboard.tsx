@@ -1,59 +1,94 @@
 "use client"
 
+import React, { useState } from "react"
+import { TeamsLayout } from "./teams/teams-layout"
+import { MyDashboard } from "./teams/my-dashboard"
 import { Button } from "@/components/ui/button"
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
-import { Users, Lock, ArrowLeft, Plus } from "lucide-react"
+import { ArrowLeft, Lock, Users } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card"
 
 interface TeamDashboardProps {
     onBack: () => void
 }
 
 export function TeamDashboard({ onBack }: TeamDashboardProps) {
-    return (
-        <div className="min-h-screen bg-background p-8 flex flex-col items-center justify-center text-center">
-            <Button variant="ghost" className="absolute top-8 left-8" onClick={onBack}>
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Return to Mode Selection
-            </Button>
+    const [activeTab, setActiveTab] = useState("personal-dashboard")
 
-            <div className="max-w-2xl mx-auto space-y-8 animate-fade-in-up">
-                <div className="w-20 h-20 bg-accent/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                    <Users className="w-10 h-10 text-accent" />
-                </div>
-
-                <h1 className="text-4xl font-bold tracking-tight">Smello for Teams</h1>
-                <p className="text-xl text-muted-foreground">
-                    Collaborative product management, strategy alignment, and team workflows.
-                </p>
-
-                <Card className="bg-card/50 border-dashed border-2">
-                    <CardHeader>
-                        <CardTitle className="flex items-center justify-center gap-2">
-                            <Lock className="w-5 h-5 text-muted-foreground" />
-                            Early Access Feature
-                        </CardTitle>
-                        <CardDescription>
-                            We are currently rolling out team features to select beta users.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <p className="text-sm">
-                            Smello for Teams will include:
-                        </p>
-                        <ul className="text-sm text-left max-w-md mx-auto space-y-2 list-disc pl-5 text-muted-foreground">
-                            <li>Real-time collaboration on PRDs and stories</li>
-                            <li>Shared team workspaces and asset libraries</li>
-                            <li>Role-based access control</li>
-                            <li>Integration with Enterprise Jira & Slack instances</li>
-                        </ul>
-
-                        <div className="pt-6">
-                            <Button className="w-full" variant="secondary" disabled>
-                                Join Waitlist (Coming Soon)
-                            </Button>
+    const renderContent = () => {
+        switch (activeTab) {
+            case "personal-dashboard":
+                return <MyDashboard />
+            case "collaboration":
+                return (
+                    <div className="flex flex-col items-center justify-center py-20 text-center space-y-6 animate-fade-in">
+                        <div className="w-16 h-16 bg-accent/10 rounded-2xl flex items-center justify-center mx-auto">
+                            <Users className="w-8 h-8 text-accent" />
                         </div>
-                    </CardContent>
-                </Card>
+                        <div className="max-w-md space-y-2">
+                            <h2 className="text-2xl font-bold">Collaboration Hub</h2>
+                            <p className="text-muted-foreground">
+                                This is where your individual work becomes team work. Move tasks here to share them with your team.
+                            </p>
+                        </div>
+                        <Card className="max-w-md bg-card/50 border-dashed">
+                            <CardHeader>
+                                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                                    <Lock className="w-4 h-4 text-muted-foreground" />
+                                    Phase 2 Development
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-xs text-muted-foreground">
+                                    The shared collaboration engine is currently being wired up to your organization's backend.
+                                </p>
+                            </CardContent>
+                        </Card>
+                    </div>
+                )
+            case "sprints":
+                return (
+                    <div className="flex flex-col items-center justify-center py-20 text-center space-y-6 animate-fade-in">
+                        <div className="w-16 h-16 bg-blue-500/10 rounded-2xl flex items-center justify-center mx-auto">
+                            <Users className="w-8 h-8 text-blue-500" />
+                        </div>
+                        <div className="max-w-md space-y-2">
+                            <h2 className="text-2xl font-bold">Sprint Board</h2>
+                            <p className="text-muted-foreground">
+                                Manage Scrum ceremonies or Kanban flows. Simple, visual, and fast.
+                            </p>
+                        </div>
+                        <Button variant="outline" className="gap-2">
+                            <Lock className="w-4 h-4" />
+                            Configure First Sprint
+                        </Button>
+                    </div>
+                )
+            default:
+                return (
+                    <div className="p-8 text-center text-muted-foreground">
+                        Content for {activeTab} coming soon.
+                    </div>
+                )
+        }
+    }
+
+    return (
+        <div className="min-h-screen bg-background relative">
+            <TeamsLayout activeTab={activeTab} onTabChange={setActiveTab} organizationName="Wizzle Org">
+                {renderContent()}
+            </TeamsLayout>
+
+            {/* Absolute positioned back button for quick exit to individual toolkit */}
+            <div className="fixed bottom-4 left-4 z-50">
+                <Button
+                    variant="secondary"
+                    size="sm"
+                    className="shadow-lg border bg-background/80 backdrop-blur"
+                    onClick={onBack}
+                >
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Back to Toolkit
+                </Button>
             </div>
         </div>
     )
