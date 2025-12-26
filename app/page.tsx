@@ -284,6 +284,10 @@ export default function HomePage() {
   }
 
   const handleCreateNew = () => {
+    setCurrentProject(null)
+    setExtractedProductName("")
+    setExtractedDescription("")
+    setParsedPdfText(null)
     setAppState("mode-selection")
   }
 
