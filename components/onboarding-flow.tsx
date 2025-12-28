@@ -14,7 +14,9 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { User, Briefcase, ArrowRight, CheckCircle2, Lock, LogIn, Loader2, Building2, Users } from "lucide-react"
-import { useClerk } from "@clerk/nextjs"
+import { useClerk, useUser } from "@clerk/nextjs"
+import { createOrganization, createTeam } from "@/lib/firestore-service"
+import { useToast } from "@/hooks/use-toast"
 
 const PREDEFINED_ROLES = [
     "Product Manager",
@@ -37,6 +39,8 @@ interface OnboardingData {
     usageType: "personal" | "team"
     organizationName?: string
     teamName?: string
+    organizationId?: string
+    teamId?: string
 }
 
 interface OnboardingFlowProps {
@@ -60,6 +64,15 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack, initialDat
     const [isSigningIn, setIsSigningIn] = useState(false)
     const [isCompleting, setIsCompleting] = useState(false)
     const { openSignIn } = useClerk()
+    const { user } = useUser()
+    const { toast } = useToast()
+
+    // Auto-advance if we have initial data from PM path
+    useEffect(() => {
+        if (initialData?.name && initialData?.role && step === 1) {
+            setStep(3)
+        }
+    }, [initialData, step])
 
     // Skip step 3 if already authenticated, but show a "Finishing up" state
     useEffect(() => {
@@ -76,7 +89,12 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack, initialDat
         } else if (step === 2 && data.productDescription) {
             setStep(3)
         } else if (step === 3) {
-            setStep(4)
+            // If they are upgrading to team mode from PM mode
+            if (data.usageType === "team") {
+                setStep(4)
+            } else {
+                setStep(4)
+            }
         } else if (step === 4) {
             if (data.usageType === "team") {
                 setStep(5)
@@ -94,8 +112,34 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack, initialDat
 
     const handleFinishSetup = async () => {
         setIsCompleting(true)
-        await new Promise(r => setTimeout(r, 800))
-        onComplete(data)
+        try {
+            let resultData = { ...data }
+
+            if (data.usageType === "team" && data.organizationName && data.teamName && user) {
+                // Create real Org and Team in Firestore
+                const orgId = await createOrganization(user.id, data.organizationName)
+                const teamId = await createTeam(orgId, data.teamName, user.id)
+
+                resultData = {
+                    ...resultData,
+                    organizationId: orgId,
+                    teamId: teamId
+                }
+            }
+
+            // Artificial delay for UX polish
+            await new Promise(r => setTimeout(r, 800))
+            onComplete(resultData)
+        } catch (error: any) {
+            console.error("Failed to complete onboarding", error)
+            toast({
+                title: "Setup Error",
+                description: error.message || "Failed to create your workspace. Please try again.",
+                variant: "destructive"
+            })
+        } finally {
+            setIsCompleting(false)
+        }
     }
 
     return (

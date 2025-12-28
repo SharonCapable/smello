@@ -107,7 +107,7 @@ export function TechnicalBlueprint({ project, onBack }: TechnicalBlueprintProps)
             const response = await fetch("/api/generate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ provider: 'gemini', prompt }),
+                body: JSON.stringify({ provider: 'anthropic', prompt }),
             })
 
             if (!response.ok) {

@@ -34,7 +34,8 @@ import {
   Milestone,
   AlertTriangle,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Users
 } from "lucide-react"
 import { useTheme } from "next-themes"
 
@@ -304,6 +305,19 @@ function SidebarContent({
           )}
           {(!isCollapsed || isMobile) && <span className="ml-2">Theme</span>}
         </Button>
+
+        <div className="pt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleNavigation("team-dashboard")}
+            className={`w-full justify-start bg-blue-600/5 text-blue-500 hover:bg-blue-600/10 border-blue-500/20 ${isCollapsed && !isMobile ? 'px-2 justify-center' : 'px-4'}`}
+            title={isCollapsed ? "Switch to Team Dashboard" : undefined}
+          >
+            <Users className="w-4 h-4 flex-shrink-0" />
+            {(!isCollapsed || isMobile) && <span className="ml-2 font-bold uppercase tracking-widest text-[10px]">Team Dashboard</span>}
+          </Button>
+        </div>
       </div>
 
     </div>

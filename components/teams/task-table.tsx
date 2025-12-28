@@ -33,6 +33,12 @@ import {
 } from "lucide-react"
 import { Slider } from "@/components/ui/slider"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 export type ColumnType =
     | "text"
@@ -64,15 +70,56 @@ interface TaskTableProps {
     onAddTask: () => void
     onDeleteTask?: (taskId: string) => void
     onPromoteTask?: (taskId: string) => void
+    onAddColumn?: (label: string, type: ColumnType) => void
+    onResizeColumn?: (columnId: string, width: number) => void
 }
 
 const STATUS_OPTIONS = ["Backlog", "To Do", "In Progress", "Review", "Blocked", "Done"]
 const PRIORITY_OPTIONS = ["Low", "Medium", "High", "Critical"]
 
-export function TaskTable({ tasks, columns, onUpdateTask, onAddTask, onDeleteTask, onPromoteTask }: TaskTableProps) {
+export function TaskTable({ tasks, columns, onUpdateTask, onAddTask, onDeleteTask, onPromoteTask, onAddColumn, onResizeColumn }: TaskTableProps) {
     const [hoveredRow, setHoveredRow] = useState<string | null>(null)
+    const [resizing, setResizing] = useState<string | null>(null)
+    const [newColumnLabel, setNewColumnLabel] = useState("")
+
+    const handleMouseDown = (e: React.MouseEvent, columnId: string) => {
+        setResizing(columnId)
+        e.preventDefault()
+    }
+
+    React.useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            if (!resizing) return
+            const col = columns.find(c => c.id === resizing)
+            if (col && onResizeColumn) {
+                // Simplified resizing logic: find the header element and calculate new width
+                // For a production app, we'd use a more robust ref-based approach
+                const header = document.getElementById(`header-${resizing}`)
+                if (header) {
+                    const rect = header.getBoundingClientRect()
+                    const newWidth = Math.max(100, e.clientX - rect.left)
+                    onResizeColumn(resizing, newWidth)
+                }
+            }
+        }
+
+        const handleMouseUp = () => {
+            setResizing(null)
+        }
+
+        if (resizing) {
+            window.addEventListener('mousemove', handleMouseMove)
+            window.addEventListener('mouseup', handleMouseUp)
+        }
+
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove)
+            window.removeEventListener('mouseup', handleMouseUp)
+        }
+    }, [resizing, columns, onResizeColumn])
 
     const renderCell = (task: Task, column: Column) => {
+        // ... (rest of renderCell remains the same)
         const value = task.values[column.id]
 
         switch (column.type) {
@@ -174,12 +221,32 @@ export function TaskTable({ tasks, columns, onUpdateTask, onAddTask, onDeleteTas
                     </div>
                 )
             case "assignee":
+                const assignees = Array.isArray(value) ? value : (value ? [value] : []);
                 return (
-                    <div className="flex items-center gap-1 px-2">
-                        <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center">
-                            <UserIcon className="w-3 h-3 text-muted-foreground" />
-                        </div>
-                        <span className="text-xs">{value || "Unassigned"}</span>
+                    <div className="flex items-center -space-x-2 px-3 overflow-hidden group/assignee">
+                        {assignees.length > 0 ? assignees.map((name: string, i: number) => (
+                            <TooltipProvider key={i}>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <div className="w-6 h-6 rounded-full bg-blue-500/10 border-2 border-background flex items-center justify-center text-[8px] font-extrabold text-blue-500 cursor-pointer hover:z-10 transition-all">
+                                            {name.split(" ").map(n => n[0]).join("").toUpperCase()}
+                                        </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent className="text-[10px] font-bold uppercase tracking-wider">{name}</TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                        )) : (
+                            <div className="flex items-center gap-1.5 opacity-40">
+                                <UserIcon className="w-3 h-3 text-muted-foreground" />
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground pt-0.5">Unassigned</span>
+                            </div>
+                        )}
+                        <Button
+                            variant="ghost"
+                            className="w-6 h-6 p-0 rounded-full opacity-0 group-hover/assignee:opacity-100 hover:bg-muted ml-2 transition-all"
+                        >
+                            <Plus className="w-3 h-3 text-muted-foreground" />
+                        </Button>
                     </div>
                 )
             default:
@@ -195,20 +262,69 @@ export function TaskTable({ tasks, columns, onUpdateTask, onAddTask, onDeleteTas
     }
 
     return (
-        <div className="rounded-md border bg-card/30 backdrop-blur-sm overflow-hidden">
-            <Table>
-                <TableHeader className="bg-muted/50 border-b">
-                    <TableRow className="hover:bg-transparent">
-                        <TableHead className="w-8 px-2"></TableHead>
+        <div className="rounded-2xl border border-border/40 bg-card/20 backdrop-blur-md overflow-hidden shadow-sm hover:shadow-md transition-all duration-300">
+            <Table className="table-fixed">
+                <TableHeader className="bg-muted/30 border-b border-border/40">
+                    <TableRow className="hover:bg-transparent border-none">
+                        <TableHead className="w-10 px-0"></TableHead>
                         {columns.map((col) => (
-                            <TableHead key={col.id} style={{ width: col.width }} className="text-xs font-bold py-2 uppercase tracking-wider text-muted-foreground">
-                                <div className="flex items-center gap-2 group cursor-pointer hover:text-foreground transition-colors">
-                                    {col.label}
-                                    <ChevronDown className="w-3 h-3 opacity-0 group-hover:opacity-50 transition-opacity" />
+                            <TableHead
+                                key={col.id}
+                                id={`header-${col.id}`}
+                                style={{ width: col.width || 200 }}
+                                className="text-[10px] font-bold py-3 uppercase tracking-[0.15em] text-muted-foreground/60 relative group px-4"
+                            >
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 group cursor-pointer hover:text-foreground transition-colors overflow-hidden">
+                                        <span className="truncate">{col.label}</span>
+                                        <ChevronDown className="w-3 h-3 opacity-0 group-hover:opacity-50 transition-opacity" />
+                                    </div>
+
+                                    {/* Resizer */}
+                                    <div
+                                        onMouseDown={(e) => handleMouseDown(e, col.id)}
+                                        className={`absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-accent/50 transition-colors ${resizing === col.id ? "bg-accent" : ""}`}
+                                    />
                                 </div>
                             </TableHead>
                         ))}
-                        <TableHead className="w-10"></TableHead>
+                        <TableHead className="w-12 px-0">
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-accent/20 text-muted-foreground">
+                                        <Plus className="w-3.5 h-3.5" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-64 p-3 shadow-xl border-accent/10" align="end">
+                                    <div className="space-y-3">
+                                        <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground/80">Add Column</div>
+                                        <Input
+                                            placeholder="Column Name"
+                                            className="h-8 text-xs bg-muted/30 border-none"
+                                            value={newColumnLabel}
+                                            onChange={(e) => setNewColumnLabel(e.target.value)}
+                                        />
+                                        <div className="grid grid-cols-2 gap-1.5">
+                                            {(["text", "status", "priority", "tags", "date"] as ColumnType[]).map(type => (
+                                                <Button
+                                                    key={type}
+                                                    variant="secondary"
+                                                    className="text-[10px] h-7 justify-start px-2 bg-muted/40 hover:bg-muted font-bold uppercase tracking-wider"
+                                                    onClick={() => {
+                                                        if (newColumnLabel && onAddColumn) {
+                                                            onAddColumn(newColumnLabel, type)
+                                                            setNewColumnLabel("")
+                                                        }
+                                                    }}
+                                                >
+                                                    {type}
+                                                </Button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
+                        </TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
