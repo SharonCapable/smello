@@ -122,7 +122,7 @@ export function ProjectDetailView({ project, onBack, onEdit, onNavigateToTool }:
 
       {/* Main Content - Tabs */}
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
+        <TabsList className="grid w-full grid-cols-3 lg:max-w-2xl">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="tools">Tools</TabsTrigger>
           {hasSourceDocument && <TabsTrigger value="source">Source Document</TabsTrigger>}

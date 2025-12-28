@@ -5,18 +5,23 @@ import { useUser } from "@clerk/nextjs"
 import { useRouter, useSearchParams } from "next/navigation"
 import { OnboardingFlow } from "@/components/onboarding-flow"
 import { Loader2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 interface OnboardingData {
     name: string
     role: string
     usageType: "personal" | "team"
     productDescription?: string
+    organizationId?: string
+    teamId?: string
+    organizationName?: string
 }
 
 function OnboardingContent() {
     const { user, isLoaded, isSignedIn } = useUser()
     const router = useRouter()
     const searchParams = useSearchParams()
+    const { toast } = useToast()
     const isEditMode = searchParams.get("mode") === "edit"
 
     const [isChecking, setIsChecking] = useState(true)
@@ -55,6 +60,13 @@ function OnboardingContent() {
                             }
                         }
                     }
+
+                    // Also check for temporary onboarding data from before sign-in
+                    const tempRaw = localStorage.getItem("smello-onboarding-temp")
+                    if (tempRaw) {
+                        const tempData = JSON.parse(tempRaw)
+                        setInitialData(prev => ({ ...prev, ...tempData }))
+                    }
                 } catch (error) {
                     console.error("Error checking status:", error)
                 }
@@ -85,6 +97,9 @@ function OnboardingContent() {
                         role: data.role,
                         selectedPath: data.usageType === "personal" ? "pm" : "team",
                         onboardingCompleted: true,
+                        organizationId: data.organizationId,
+                        teamId: data.teamId,
+                        organizationName: data.organizationName
                     }),
                 })
 
@@ -95,7 +110,10 @@ function OnboardingContent() {
                 const permanentData = {
                     name: data.name,
                     role: data.role,
-                    usageType: data.usageType
+                    usageType: data.usageType,
+                    organizationId: data.organizationId,
+                    teamId: data.teamId,
+                    organizationName: data.organizationName
                 }
                 localStorage.setItem("smello-user-onboarding", JSON.stringify(permanentData))
 
@@ -107,8 +125,13 @@ function OnboardingContent() {
                     router.push("/")
                 }
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error completing onboarding:", error)
+            toast({
+                title: "Profile Sync Error",
+                description: error.message || "We couldn't sync your profile to the server.",
+                variant: "destructive"
+            })
         }
     }
 

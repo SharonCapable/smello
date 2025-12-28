@@ -128,12 +128,27 @@ export default function HomePage() {
     if (isSignedIn && user) {
       if (onboardingData) {
         const data = JSON.parse(onboardingData)
+
+        // RBAC: Restricted PM Role Check
+        const pmRoles = ["Product Manager", "Product Owner", "Founder / CEO", "CTO / Technical Lead", "Project Manager"];
+        const isPMRole = pmRoles.includes(data.role);
+
         // If we are currently in landing/onboarding, move them to their dashboard
         if (isTransitionState) {
           if (data.usageType === "team") {
-            setAppState("team-dashboard")
+            if (!data.organizationId) {
+              setAppState("onboarding")
+            } else {
+              setAppState("team-dashboard")
+            }
           } else {
-            setAppState("workflow-home")
+            if (!isPMRole) {
+              // If they chose personal but aren't a PM role, maybe they should be in team?
+              // For now, still allow but we'll add a badge/limit or prompt
+              setAppState("workflow-home")
+            } else {
+              setAppState("workflow-home")
+            }
           }
         }
         setIsCheckingProfile(false)
@@ -215,7 +230,7 @@ export default function HomePage() {
     if (data.usageType === "team") {
       setAppState("team-dashboard")
     } else {
-      setAppState("workflow-home")
+      setAppState("settings")
     }
   }
 
@@ -229,6 +244,17 @@ export default function HomePage() {
   }
 
   const handleNavigation = (state: AppState) => {
+    // Onboarding Check for Team Dashboard
+    if (state === "team-dashboard") {
+      const onboardingDataRaw = localStorage.getItem("smello-user-onboarding")
+      const onboardingData = onboardingDataRaw ? JSON.parse(onboardingDataRaw) : {}
+
+      if (!onboardingData.organizationId) {
+        setAppState("onboarding")
+        return
+      }
+    }
+
     setAppState(state);
     if (state === 'home') {
       setEntryMode(null);
@@ -406,18 +432,26 @@ export default function HomePage() {
   }
 
   if (appState === "onboarding") {
+    const existingData = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("smello-user-onboarding") || "{}") : {}
     return <OnboardingFlow
       onComplete={handleOnboardingComplete}
       isAuthenticated={!!isSignedIn}
       onBack={() => setAppState("landing")}
+      initialData={existingData}
     />
   }
 
   if (appState === "team-dashboard") {
-    return <TeamDashboard onBack={() => {
-      // Return to mode selection instead of landing
-      setAppState("mode-selection")
-    }} />
+    const onboardingData = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("smello-user-onboarding") || "{}") : {}
+    return <TeamDashboard
+      organizationId={onboardingData.organizationId}
+      teamId={onboardingData.teamId}
+      organizationName={onboardingData.organizationName}
+      onBack={() => {
+        // Return to mode selection instead of landing
+        setAppState("workflow-home")
+      }}
+    />
   }
 
   // Main App Views (With Sidebar)

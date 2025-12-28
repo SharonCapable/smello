@@ -66,7 +66,7 @@ export async function POST(req: Request, { params }: { params: { uid: string } }
     const body = await req.json()
     // Whitelist allowed fields
     const allowed: Record<string, any> = {}
-    const keys = ['email', 'name', 'displayName', 'photoURL', 'role', 'selectedPath', 'onboardingCompleted']
+    const keys = ['email', 'name', 'displayName', 'photoURL', 'role', 'selectedPath', 'onboardingCompleted', 'organizationId', 'teamId', 'organizationName']
     for (const k of keys) {
       if (body[k] !== undefined) allowed[k] = body[k]
     }

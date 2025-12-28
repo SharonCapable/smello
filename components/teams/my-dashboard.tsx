@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
-import { TaskTable, Column, Task } from "./task-table"
+import { TaskTable, Column, Task, ColumnType } from "./task-table"
 import { Button } from "@/components/ui/button"
 import {
     Plus,
@@ -46,6 +46,7 @@ interface MyDashboardProps {
 
 export function MyDashboard({ onPromoteTask }: MyDashboardProps) {
     const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS)
+    const [columns, setColumns] = useState<Column[]>(DEFAULT_COLUMNS)
     const [searchQuery, setSearchQuery] = useState("")
     const [lastSynced, setLastSynced] = useState(new Date())
 
@@ -68,6 +69,22 @@ export function MyDashboard({ onPromoteTask }: MyDashboardProps) {
     const handleDeleteTask = (taskId: string) => {
         setTasks(prev => prev.filter(t => t.id !== taskId))
         setLastSynced(new Date())
+    }
+
+    const handleResizeColumn = (columnId: string, width: number) => {
+        setColumns(prev => prev.map(col =>
+            col.id === columnId ? { ...col, width } : col
+        ))
+    }
+
+    const handleAddColumn = (label: string, type: ColumnType) => {
+        const newCol: Column = {
+            id: label.toLowerCase().replace(/\s+/g, "_"),
+            label,
+            type,
+            width: 150
+        }
+        setColumns([...columns, newCol])
     }
 
     const handleInternalPromoteTask = (taskId: string) => {
@@ -178,11 +195,13 @@ export function MyDashboard({ onPromoteTask }: MyDashboardProps) {
             <div className="flex-grow min-h-[400px]">
                 <TaskTable
                     tasks={tasks.filter(t => (t.values.title || "").toLowerCase().includes(searchQuery.toLowerCase()))}
-                    columns={DEFAULT_COLUMNS}
+                    columns={columns}
                     onUpdateTask={handleUpdateTask}
                     onAddTask={handleAddTask}
                     onDeleteTask={handleDeleteTask}
                     onPromoteTask={handleInternalPromoteTask}
+                    onResizeColumn={handleResizeColumn}
+                    onAddColumn={handleAddColumn}
                 />
             </div>
 

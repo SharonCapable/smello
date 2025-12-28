@@ -54,7 +54,7 @@ import { useToast } from "@/hooks/use-toast"
 import type { Epic, UserStory } from "@/types/user-story"
 import type { StoredProject } from "@/lib/storage"
 import { updateProject } from "@/lib/storage-hybrid"
-import { generateUserStoriesForEpic, generateAdditionalUserStories, type GenerationOptions } from "@/lib/ai-generation"
+import { generateUserStoriesForEpic, generateAdditionalUserStories, generateEpicsFromProduct, type GenerationOptions } from "@/lib/ai-generation"
 
 interface ProjectManagementViewProps {
   project: StoredProject
@@ -113,6 +113,33 @@ export function ProjectManagementView({ project, onBack, onProjectUpdate, onNavi
       title: "Epic Added",
       description: `"${newEpicTitle}" has been added to your project.`,
     })
+  }
+
+  const handleAutoGenerateEpics = async () => {
+    setIsGenerating(true)
+    try {
+      const generatedEpics = await generateEpicsFromProduct(currentProject.product, { provider: 'anthropic' })
+
+      setCurrentProject((prev) => ({
+        ...prev,
+        epics: [...prev.epics, ...generatedEpics],
+        updated_at: new Date().toISOString(),
+      }))
+
+      toast({
+        title: "Epics Generated",
+        description: `Successfully generated ${generatedEpics.length} new epics for your project.`,
+      })
+      setShowNewEpicDialog(false)
+    } catch (error) {
+      toast({
+        title: "Generation Failed",
+        description: "Failed to generate epics. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsGenerating(false)
+    }
   }
 
   const handleDeleteEpic = (epicId: string) => {
@@ -326,6 +353,10 @@ export function ProjectManagementView({ project, onBack, onProjectUpdate, onNavi
                 <div className="flex justify-end gap-2">
                   <Button variant="outline" onClick={() => setShowNewEpicDialog(false)}>
                     Cancel
+                  </Button>
+                  <Button variant="secondary" onClick={handleAutoGenerateEpics} disabled={isGenerating}>
+                    {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
+                    Generate with AI
                   </Button>
                   <Button onClick={handleAddEpic} disabled={!newEpicTitle.trim()}>
                     Create Epic

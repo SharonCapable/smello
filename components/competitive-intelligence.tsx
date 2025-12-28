@@ -127,7 +127,7 @@ export function CompetitiveIntelligence({ project, onBack }: CompetitiveIntellig
             const response = await fetch('/api/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ provider: 'gemini', prompt, model: 'gemini-2.0-flash-exp' }),
+                body: JSON.stringify({ provider: 'anthropic', prompt, model: 'claude-3-5-sonnet-latest' }),
             })
 
             if (!response.ok) {
