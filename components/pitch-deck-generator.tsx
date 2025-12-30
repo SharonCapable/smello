@@ -1,14 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
-import { Presentation, Sparkles, Download, Plus, Trash2, Copy, Check, Edit3, Eye } from "lucide-react"
+import { Presentation, Sparkles, Download, Plus, Trash2, Copy, Check, Edit3, Eye, Save } from "lucide-react"
 import { ApiKeyManager } from "@/lib/api-key-manager"
 import { ApiKeySetup } from "@/components/api-key-setup"
 import { MarkdownRenderer } from "@/components/markdown-renderer"
 import type { StoredProject } from "@/lib/storage"
+import { savePitchDeckToProject } from "@/lib/project-artifacts-manager"
+import { savePitchDeckToProject } from "@/lib/project-artifacts-manager"
 
 interface PitchDeckGeneratorProps {
     project?: StoredProject | null
@@ -51,6 +53,15 @@ export function PitchDeckGenerator({ project, onBack }: PitchDeckGeneratorProps)
     const [showApiKeySetup, setShowApiKeySetup] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [copied, setCopied] = useState<string | null>(null)
+    const [isSaving, setIsSaving] = useState(false)
+    const [saveSuccess, setSaveSuccess] = useState(false)
+
+    // Load existing pitch deck if available
+    useEffect(() => {
+        if (project?.pitchDeck && Array.isArray(project.pitchDeck) && slides.length === 0) {
+            setSlides(project.pitchDeck)
+        }
+    }, [project])
 
     const handleAddSlide = (type: SlideType) => {
         const slideDef = SLIDE_TYPES.find(s => s.type === type)
@@ -105,7 +116,7 @@ export function PitchDeckGenerator({ project, onBack }: PitchDeckGeneratorProps)
             const response = await fetch('/api/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ provider: 'gemini', prompt, model: 'gemini-2.0-flash-exp' }),
+                body: JSON.stringify({ provider: 'anthropic', prompt, model: 'claude-3-5-sonnet-latest' }),
             })
 
             if (!response.ok) {
@@ -126,6 +137,22 @@ export function PitchDeckGenerator({ project, onBack }: PitchDeckGeneratorProps)
             setError(error instanceof Error ? error.message : "Failed to generate content")
         } finally {
             setIsGenerating(false)
+        }
+    }
+
+    const handleSaveToProject = async () => {
+        if (!project?.id) return
+        setIsSaving(true)
+        setError(null)
+        try {
+            await savePitchDeckToProject(project.id, slides)
+            setSaveSuccess(true)
+            setTimeout(() => setSaveSuccess(false), 3000)
+        } catch (error) {
+            console.error("Error saving pitch deck:", error)
+            setError("Failed to save pitch deck to project")
+        } finally {
+            setIsSaving(false)
         }
     }
 
@@ -168,6 +195,16 @@ export function PitchDeckGenerator({ project, onBack }: PitchDeckGeneratorProps)
                 </div>
                 <div className="flex gap-2">
                     <Button variant="outline" onClick={onBack}>Back</Button>
+                    {project && (
+                        <Button
+                            onClick={handleSaveToProject}
+                            disabled={slides.length === 0 || isSaving}
+                            variant={saveSuccess ? "default" : "outline"}
+                        >
+                            <Plus className="w-4 h-4 mr-2" />
+                            {isSaving ? "Saving..." : saveSuccess ? "Saved!" : "Save to Project"}
+                        </Button>
+                    )}
                     <Button onClick={handleExport} disabled={slides.length === 0}>
                         <Download className="w-4 h-4 mr-2" />
                         Export Markdown

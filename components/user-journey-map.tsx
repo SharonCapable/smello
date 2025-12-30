@@ -10,6 +10,8 @@ import { Slider } from "@/components/ui/slider"
 import { ApiKeyManager } from "@/lib/api-key-manager"
 import { ApiKeySetup } from "@/components/api-key-setup"
 import type { StoredProject } from "@/lib/storage"
+import { saveJourneyMapsToProject } from "@/lib/project-artifacts-manager"
+import { useEffect } from "react"
 
 interface UserJourneyMapProps {
     project?: StoredProject | null
@@ -50,6 +52,15 @@ export function UserJourneyMap({ project, onBack }: UserJourneyMapProps) {
     const [isGenerating, setIsGenerating] = useState(false)
     const [showApiKeySetup, setShowApiKeySetup] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [isSaving, setIsSaving] = useState(false)
+    const [saveSuccess, setSaveSuccess] = useState(false)
+
+    // Load existing journey if available
+    useEffect(() => {
+        if (project?.journeyMaps && Array.isArray(project.journeyMaps) && project.journeyMaps.length > 0) {
+            setStages(project.journeyMaps)
+        }
+    }, [project])
 
     const handleUpdateStage = (id: string, field: keyof JourneyStage, value: any) => {
         setStages(stages.map(s => s.id === id ? { ...s, [field]: value } : s))
@@ -148,6 +159,22 @@ export function UserJourneyMap({ project, onBack }: UserJourneyMapProps) {
         }
     }
 
+    const handleSaveToProject = async () => {
+        if (!project?.id) return
+        setIsSaving(true)
+        setError(null)
+        try {
+            await saveJourneyMapsToProject(project.id, stages)
+            setSaveSuccess(true)
+            setTimeout(() => setSaveSuccess(false), 3000)
+        } catch (error) {
+            console.error("Error saving journey map:", error)
+            setError("Failed to save journey map to project")
+        } finally {
+            setIsSaving(false)
+        }
+    }
+
     const getEmotionIcon = (score: number) => {
         if (score <= 2) return <Frown className="w-5 h-5 text-red-500" />
         if (score === 3) return <Meh className="w-5 h-5 text-yellow-500" />
@@ -174,6 +201,16 @@ export function UserJourneyMap({ project, onBack }: UserJourneyMapProps) {
                 </div>
                 <div className="flex gap-2">
                     <Button variant="outline" onClick={onBack}>Back</Button>
+                    {project && (
+                        <Button
+                            onClick={handleSaveToProject}
+                            disabled={stages.length === 0 || isSaving}
+                            variant={saveSuccess ? "default" : "outline"}
+                        >
+                            <Plus className="w-4 h-4 mr-2" />
+                            {isSaving ? "Saving..." : saveSuccess ? "Saved!" : "Save to Project"}
+                        </Button>
+                    )}
                     <Button onClick={handleGenerate} disabled={isGenerating}>
                         <Sparkles className="w-4 h-4 mr-2" />
                         Auto-Generate Journey

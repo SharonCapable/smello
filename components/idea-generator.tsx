@@ -143,7 +143,18 @@ Return ONLY a JSON array with this exact structure:
     })
 
     if (!response.ok) {
-      throw new Error("Failed to generate ideas. Please check your API key.")
+      const errorData = await response.json().catch(() => ({}))
+
+      // Handle specific error types
+      if (errorData.error === 'free_limit_exceeded') {
+        throw new Error('Free trial limit exceeded. Please add your own Gemini API key in Settings → API Keys to continue generating ideas.')
+      } else if (errorData.error === 'missing_gemini_key') {
+        throw new Error('No Gemini API key configured. Please add your API key in Settings → API Keys.')
+      } else if (errorData.message) {
+        throw new Error(errorData.message)
+      } else {
+        throw new Error("Failed to generate ideas. Please check your API key configuration in Settings.")
+      }
     }
 
     const data = await response.json()

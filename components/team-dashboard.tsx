@@ -2,6 +2,7 @@
 
 import React, { useState } from "react"
 import { MyDashboard } from "./teams/my-dashboard"
+import { ProjectsView } from "./teams/projects-view"
 import { CollaborationHub } from "./teams/collaboration-hub"
 import { SprintBoard } from "./teams/sprint-board"
 import { TeamsLayout } from "./teams/teams-layout"
@@ -47,6 +48,8 @@ export function TeamDashboard({ onBack, organizationId, teamId, organizationName
         switch (activeTab) {
             case "personal-dashboard":
                 return <MyDashboard onPromoteTask={handlePromoteTask} />
+            case "projects":
+                return <ProjectsView organizationId={organizationId} teamId={teamId} />
             case "collaboration":
                 return <CollaborationHub tasks={teamTasks} setTasks={setTeamTasks} />
             case "sprints":

@@ -9,6 +9,8 @@ import { Calendar, Sparkles, Plus, Trash2, Milestone } from "lucide-react"
 import { ApiKeyManager } from "@/lib/api-key-manager"
 import { ApiKeySetup } from "@/components/api-key-setup"
 import type { StoredProject } from "@/lib/storage"
+import { saveRoadmapToProject } from "@/lib/project-artifacts-manager"
+import { useEffect } from "react"
 
 interface RoadmapBuilderProps {
     project?: StoredProject | null
@@ -33,6 +35,15 @@ export function RoadmapBuilder({ project, onBack }: RoadmapBuilderProps) {
     const [isGenerating, setIsGenerating] = useState(false)
     const [showApiKeySetup, setShowApiKeySetup] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [isSaving, setIsSaving] = useState(false)
+    const [saveSuccess, setSaveSuccess] = useState(false)
+
+    // Load existing roadmap if available
+    useEffect(() => {
+        if (project?.roadmap && Array.isArray(project.roadmap) && project.roadmap.length > 0) {
+            setPhases(project.roadmap)
+        }
+    }, [project])
 
     const handleUpdatePhase = (id: string, field: keyof RoadmapPhase, value: any) => {
         setPhases(phases.map(p => p.id === id ? { ...p, [field]: value } : p))
@@ -96,7 +107,7 @@ export function RoadmapBuilder({ project, onBack }: RoadmapBuilderProps) {
             const response = await fetch('/api/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ provider: 'gemini', prompt, model: 'gemini-2.0-flash-exp' }),
+                body: JSON.stringify({ provider: 'anthropic', prompt, model: 'claude-3-5-sonnet-latest' }),
             })
 
             if (!response.ok) {
@@ -104,7 +115,7 @@ export function RoadmapBuilder({ project, onBack }: RoadmapBuilderProps) {
             }
 
             const data = await response.json()
-            const content = data.candidates?.[0]?.content?.parts?.[0]?.text
+            const content = data.content?.[0]?.text || data.candidates?.[0]?.content?.parts?.[0]?.text
 
             if (content) {
                 const cleanedText = content.replace(/```json\n?|\n?```/g, "").trim()
@@ -129,6 +140,22 @@ export function RoadmapBuilder({ project, onBack }: RoadmapBuilderProps) {
         }
     }
 
+    const handleSaveToProject = async () => {
+        if (!project?.id) return
+        setIsSaving(true)
+        setError(null)
+        try {
+            await saveRoadmapToProject(project.id, phases)
+            setSaveSuccess(true)
+            setTimeout(() => setSaveSuccess(false), 3000)
+        } catch (error) {
+            console.error("Error saving roadmap:", error)
+            setError("Failed to save roadmap to project")
+        } finally {
+            setIsSaving(false)
+        }
+    }
+
     return (
         <div className="max-w-6xl mx-auto space-y-8">
             <ApiKeySetup
@@ -149,6 +176,16 @@ export function RoadmapBuilder({ project, onBack }: RoadmapBuilderProps) {
                 </div>
                 <div className="flex gap-2">
                     <Button variant="outline" onClick={onBack}>Back</Button>
+                    {project && (
+                        <Button
+                            onClick={handleSaveToProject}
+                            disabled={phases.length === 0 || isSaving}
+                            variant={saveSuccess ? "default" : "outline"}
+                        >
+                            <Plus className="w-4 h-4 mr-2" />
+                            {isSaving ? "Saving..." : saveSuccess ? "Saved!" : "Save to Project"}
+                        </Button>
+                    )}
                     <Button onClick={handleGenerate} disabled={isGenerating}>
                         <Sparkles className="w-4 h-4 mr-2" />
                         Auto-Generate Roadmap

@@ -3,23 +3,59 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if user is authenticated
+    // ============================================
+    // HELPER FUNCTIONS
+    // ============================================
+    
+    // Check if user is authenticated
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    // Helper function to check if user owns the resource
+    // Check if user owns the resource
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
+    
+    // Check if user is a super admin (can create organizations)
+    function isSuperAdmin() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isSuperAdmin == true;
+    }
+    
+    // Check if user is a member of an organization
+    function isOrgMember(orgId) {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid));
+    }
+    
+    // Check if user is an organization admin
+    function isOrgAdmin(orgId) {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) &&
+             (get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role == 'super_admin' ||
+              get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role == 'org_admin');
+    }
+    
+    // Check if user is a team admin
+    function isTeamAdmin(orgId, teamId) {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/organizations/$(orgId)/teams/$(teamId)/members/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/organizations/$(orgId)/teams/$(teamId)/members/$(request.auth.uid)).data.role == 'admin';
+    }
 
+    // ============================================
+    // PERSONAL USER DATA (Existing Rules)
+    // ============================================
+    
     // Users collection - users can only read/write their own profile
     match /users/{userId} {
       allow read: if isOwner(userId);
       allow write: if isOwner(userId);
     }
 
-    // Projects collection - users can only access their own projects
+    // Personal Projects collection - users can only access their own projects
     match /projects/{projectId} {
       allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
@@ -36,6 +72,100 @@ service cloud.firestore {
     match /apiKeys/{userId} {
       allow read: if isOwner(userId);
       allow write: if isOwner(userId);
+    }
+
+    // ============================================
+    // TEAM COLLABORATION (Access-Controlled)
+    // ============================================
+    
+    // Organizations - ONLY super admins can create
+    match /organizations/{orgId} {
+      // Only org members can read
+      allow read: if isOrgMember(orgId);
+      // ONLY super admins can create organizations
+      allow create: if isSuperAdmin();
+      // Only org admins can update/delete
+      allow update, delete: if isOrgAdmin(orgId);
+      
+      // Organization Members
+      match /members/{memberId} {
+        allow read: if isOrgMember(orgId);
+        allow write: if isOrgAdmin(orgId);
+      }
+      
+      // Team Projects (nested under organization)
+      match /projects/{projectId} {
+        allow read: if isOrgMember(orgId);
+        allow create: if isOrgMember(orgId);
+        allow update: if isOrgMember(orgId);
+        allow delete: if isOrgAdmin(orgId);
+      }
+      
+      // Workflows (nested under organization)
+      match /workflows/{workflowId} {
+        allow read: if isOrgMember(orgId);
+        allow create: if isOrgMember(orgId);
+        allow update: if isOrgMember(orgId);
+        allow delete: if isOrgAdmin(orgId);
+      }
+      
+      // Team Tasks (nested under organization)
+      match /tasks/{taskId} {
+        allow read: if isOrgMember(orgId);
+        allow create: if isOrgMember(orgId);
+        allow update: if isOrgMember(orgId);
+        allow delete: if isOrgMember(orgId);
+      }
+      
+      // Teams (nested under organization)
+      match /teams/{teamId} {
+        allow read: if isOrgMember(orgId);
+        // Only org admins can create teams
+        allow create: if isOrgAdmin(orgId);
+        allow update: if isOrgAdmin(orgId) || isTeamAdmin(orgId, teamId);
+        allow delete: if isOrgAdmin(orgId);
+        
+        // Team Members
+        match /members/{memberId} {
+          allow read: if isOrgMember(orgId);
+          allow write: if isOrgAdmin(orgId) || isTeamAdmin(orgId, teamId);
+        }
+        
+        // Sprints (nested under team)
+        match /sprints/{sprintId} {
+          allow read: if isOrgMember(orgId);
+          allow create: if isOrgMember(orgId);
+          allow update: if isOrgMember(orgId);
+          allow delete: if isOrgAdmin(orgId) || isTeamAdmin(orgId, teamId);
+        }
+      }
+    }
+    
+    // ============================================
+    // GLOBAL COLLECTIONS (Shared Resources)
+    // ============================================
+    
+    // Activities - global read for authenticated users
+    // Anyone can read activities for projects they have access to
+    match /activities/{activityId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+    
+    // Comments - authenticated users can read/write
+    match /comments/{commentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+    
+    // Invites - for organization invitations
+    match /invites/{inviteId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated() && resource.data.invitedBy == request.auth.uid;
     }
   }
 }

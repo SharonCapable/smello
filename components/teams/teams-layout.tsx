@@ -17,7 +17,8 @@ import {
     HelpCircle,
     Bell,
     Mail,
-    UserPlus
+    UserPlus,
+    Folder
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -161,6 +162,13 @@ export function TeamsLayout({ children, activeTab, onTabChange, organizationName
                                 <div className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest">Implementation</div>
                             </div>
                         )}
+                        <NavItem
+                            icon={Folder}
+                            label="Projects"
+                            active={activeTab === "projects"}
+                            onClick={() => onTabChange("projects")}
+                            collapsed={collapsed}
+                        />
                         <NavItem
                             icon={MessageSquare}
                             label="Collaboration Hub"

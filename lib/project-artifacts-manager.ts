@@ -205,6 +205,18 @@ export async function saveRiskAnalysisToProject(
 }
 
 /**
+ * Save feature prioritization to project
+ */
+export async function saveFeaturePrioritizationToProject(
+  projectId: string,
+  prioritization: any[]
+): Promise<void> {
+  await updateProject(projectId, {
+    featurePrioritization: prioritization,
+  } as any)
+}
+
+/**
  * Get all artifacts for a project
  */
 export async function getProjectArtifacts(projectId: string): Promise<ProjectArtifacts | null> {

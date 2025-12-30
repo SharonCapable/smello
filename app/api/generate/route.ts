@@ -64,12 +64,11 @@ export async function POST(req: Request) {
     if (provider === 'gemini') {
       // priority: process.env -> session.accessToken (bearer) -> storedKeys.geminiKey -> clientApiKey
 
-      let serverKeyUsed = false
+      let serverKeyLimitExceeded = false
       const envKey = process.env.GEMINI_API_KEY
 
       // 1. Try Server Key (with limit enforcement)
       if (envKey) {
-        let limitExceeded = false
         try {
           initAdmin()
           const db = admin.firestore()
@@ -80,7 +79,8 @@ export async function POST(req: Request) {
 
           if (current >= FREE_LIMIT) {
             console.log(`User ${sessionUid} exceeded free limit (server key skipped): ${current}/${FREE_LIMIT}`)
-            limitExceeded = true
+            serverKeyLimitExceeded = true
+            // Don't return yet - try user's own keys first
           } else {
             // Increment and Use
             await statsRef.set({ userId: sessionUid, operationCount: admin.firestore.FieldValue.increment(1), updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true })
@@ -103,7 +103,7 @@ export async function POST(req: Request) {
           }
         } catch (e: any) {
           console.error('generate gemini server-key error', e)
-          // If error is internal system error, maybe we skip to next method?
+          // If error is internal system error, skip to next method
         }
       }
 
@@ -142,41 +142,70 @@ export async function POST(req: Request) {
         }
       }
 
-      // Stored user key
+      // 3. Stored user key
       const storedKey = storedKeys?.geminiKey || null
       if (storedKey) {
-        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': storedKey },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.7 } }),
-        })
+        try {
+          const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': storedKey },
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.7 } }),
+          })
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          return NextResponse.json({ error: errorData.error?.message || 'Gemini API Error' }, { status: response.status })
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            return NextResponse.json({ error: errorData.error?.message || 'Gemini API Error' }, { status: response.status })
+          }
+
+          const data = await response.json()
+          return NextResponse.json(data)
+        } catch (e: any) {
+          console.error('generate gemini with stored key error', e)
+          // Fallthrough to client key
         }
-
-        const data = await response.json()
-        return NextResponse.json(data)
       }
 
-      // Fallback: client-provided key
+      // 4. Fallback: client-provided key
       const apiKey = clientApiKey
-      if (!apiKey) return NextResponse.json({ error: 'server_missing_gemini_key' }, { status: 500 })
+      if (apiKey) {
+        try {
+          const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.7 } }),
+          })
 
-      const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.7 } }),
-      })
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            return NextResponse.json({ error: errorData.error?.message || 'Gemini API Error' }, { status: response.status })
+          }
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        return NextResponse.json({ error: errorData.error?.message || 'Gemini API Error' }, { status: response.status })
+          const data = await response.json()
+          return NextResponse.json(data)
+        } catch (e: any) {
+          console.error('generate gemini with client key error', e)
+        }
       }
 
-      const data = await response.json()
-      return NextResponse.json(data)
+      // No API key available at all
+      if (serverKeyLimitExceeded) {
+        // User hit the free limit and has no personal API key configured
+        const statsRef = admin.firestore().collection('usageStats').doc(sessionUid)
+        const statsSnap = await statsRef.get()
+        const current = statsSnap.exists ? (statsSnap.data()?.operationCount || 0) : 0
+        const FREE_LIMIT = Number(process.env.FREE_AI_OPERATIONS_LIMIT || 6)
+        return NextResponse.json({
+          error: 'free_limit_exceeded',
+          remaining: Math.max(0, FREE_LIMIT - current),
+          message: 'Free trial limit exceeded. Please add your own API key in Settings to continue.'
+        }, { status: 403 })
+      } else {
+        // No keys configured at all
+        return NextResponse.json({
+          error: 'missing_gemini_key',
+          message: 'No Gemini API key configured. Please add your API key in Settings.'
+        }, { status: 500 })
+      }
     }
 
     if (provider === 'anthropic') {
@@ -206,7 +235,7 @@ export async function POST(req: Request) {
               'x-api-key': envKey,
               'anthropic-version': '2023-06-01',
             },
-            body: JSON.stringify({ model: model || 'claude-sonnet-4-5', max_tokens: 4096, messages: [{ role: 'user', content: prompt }] }),
+            body: JSON.stringify({ model: model || 'claude-3-5-sonnet-latest', max_tokens: 4096, messages: [{ role: 'user', content: prompt }] }),
           })
 
           if (!response.ok) {
@@ -231,7 +260,7 @@ export async function POST(req: Request) {
             'x-api-key': storedKey,
             'anthropic-version': '2023-06-01',
           },
-          body: JSON.stringify({ model: model || 'claude-sonnet-4-5', max_tokens: 4096, messages: [{ role: 'user', content: prompt }] }),
+          body: JSON.stringify({ model: model || 'claude-3-5-sonnet-latest', max_tokens: 4096, messages: [{ role: 'user', content: prompt }] }),
         })
 
         if (!response.ok) {
@@ -254,7 +283,7 @@ export async function POST(req: Request) {
           'x-api-key': apiKey,
           'anthropic-version': '2023-06-01',
         },
-        body: JSON.stringify({ model: model || 'claude-sonnet-4-5', max_tokens: 4096, messages: [{ role: 'user', content: prompt }] }),
+        body: JSON.stringify({ model: model || 'claude-3-5-sonnet-latest', max_tokens: 4096, messages: [{ role: 'user', content: prompt }] }),
       })
 
       if (!response.ok) {

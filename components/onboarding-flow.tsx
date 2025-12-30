@@ -117,8 +117,13 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack, initialDat
 
             if (data.usageType === "team" && data.organizationName && data.teamName && user) {
                 // Create real Org and Team in Firestore
+                console.log('Creating organization:', data.organizationName)
                 const orgId = await createOrganization(user.id, data.organizationName)
+                console.log('Organization created:', orgId)
+
+                console.log('Creating team:', data.teamName)
                 const teamId = await createTeam(orgId, data.teamName, user.id)
+                console.log('Team created:', teamId)
 
                 resultData = {
                     ...resultData,

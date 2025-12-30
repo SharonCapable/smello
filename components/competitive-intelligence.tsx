@@ -13,6 +13,8 @@ import { ApiKeyManager } from "@/lib/api-key-manager"
 import { ApiKeySetup } from "@/components/api-key-setup"
 import { MarkdownRenderer } from "@/components/markdown-renderer"
 import type { StoredProject } from "@/lib/storage"
+import { saveCompetitorAnalysisToProject } from "@/lib/project-artifacts-manager"
+import { useEffect } from "react"
 
 interface CompetitiveIntelligenceProps {
     project?: StoredProject | null
@@ -37,6 +39,18 @@ export function CompetitiveIntelligence({ project, onBack }: CompetitiveIntellig
         context: string
     }>>([])
     const [showHistory, setShowHistory] = useState(false)
+    const [isSaving, setIsSaving] = useState(false)
+    const [saveSuccess, setSaveSuccess] = useState(false)
+
+    // Load from project on mount if available
+    useEffect(() => {
+        if (project?.competitorAnalysis) {
+            const analysis = project.competitorAnalysis
+            if (analysis.swot) setSwot(analysis.swot)
+            if (analysis.featureMatrix) setFeatureMatrix(analysis.featureMatrix)
+            if (analysis.competitors) setCompetitors(analysis.competitors)
+        }
+    }, [project])
 
     // Load history on mount
     useState(() => {
@@ -142,6 +156,16 @@ export function CompetitiveIntelligence({ project, onBack }: CompetitiveIntellig
                 if (type === "swot") setSwot(cleaned)
                 else setFeatureMatrix(cleaned)
 
+                // Trigger auto-save to project if project exists
+                if (project?.id) {
+                    saveCompetitorAnalysisToProject(project.id, {
+                        swot: type === "swot" ? cleaned : swot,
+                        featureMatrix: type === "matrix" ? cleaned : featureMatrix,
+                        competitors,
+                        lastUpdated: new Date().toISOString()
+                    }).catch(console.error)
+                }
+
                 saveHistory({
                     id: Date.now().toString(),
                     date: new Date().toISOString(),
@@ -157,6 +181,27 @@ export function CompetitiveIntelligence({ project, onBack }: CompetitiveIntellig
             setError(error instanceof Error ? error.message : "Failed to generate content")
         } finally {
             setIsGenerating(false)
+        }
+    }
+
+    const handleSaveToProject = async () => {
+        if (!project?.id) return
+        setIsSaving(true)
+        setError(null)
+        try {
+            await saveCompetitorAnalysisToProject(project.id, {
+                swot,
+                featureMatrix,
+                competitors,
+                lastUpdated: new Date().toISOString()
+            })
+            setSaveSuccess(true)
+            setTimeout(() => setSaveSuccess(false), 3000)
+        } catch (error) {
+            console.error("Error saving competitive intelligence:", error)
+            setError("Failed to save to project")
+        } finally {
+            setIsSaving(false)
         }
     }
 
@@ -223,6 +268,16 @@ export function CompetitiveIntelligence({ project, onBack }: CompetitiveIntellig
                         </SheetContent>
                     </Sheet>
                     <Button variant="outline" onClick={onBack}>Back</Button>
+                    {project && (
+                        <Button
+                            onClick={handleSaveToProject}
+                            disabled={(!swot && !featureMatrix) || isSaving}
+                            variant={saveSuccess ? "default" : "outline"}
+                        >
+                            <Plus className="w-4 h-4 mr-2" />
+                            {isSaving ? "Saving..." : saveSuccess ? "Saved!" : "Save to Project"}
+                        </Button>
+                    )}
                 </div>
             </div>
 

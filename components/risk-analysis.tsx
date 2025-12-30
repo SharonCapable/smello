@@ -1,15 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { AlertTriangle, Sparkles, Plus, Trash2, Activity } from "lucide-react"
+import { AlertTriangle, Sparkles, Plus, Trash2, Activity, Save } from "lucide-react"
 import { Slider } from "@/components/ui/slider"
 import { ApiKeyManager } from "@/lib/api-key-manager"
 import { ApiKeySetup } from "@/components/api-key-setup"
 import type { StoredProject } from "@/lib/storage"
+import { saveRiskAnalysisToProject } from "@/lib/project-artifacts-manager"
 
 interface RiskAnalysisProps {
     project?: StoredProject | null
@@ -33,6 +34,15 @@ export function RiskAnalysis({ project, onBack }: RiskAnalysisProps) {
     const [isGenerating, setIsGenerating] = useState(false)
     const [showApiKeySetup, setShowApiKeySetup] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [isSaving, setIsSaving] = useState(false)
+    const [saveSuccess, setSaveSuccess] = useState(false)
+
+    // Load existing risks if available
+    useEffect(() => {
+        if (project?.riskAnalysis && Array.isArray(project.riskAnalysis) && risks.length === 0) {
+            setRisks(project.riskAnalysis)
+        }
+    }, [project])
 
     const handleAddRisk = () => {
         setRisks([
@@ -130,6 +140,22 @@ export function RiskAnalysis({ project, onBack }: RiskAnalysisProps) {
         }
     }
 
+    const handleSaveToProject = async () => {
+        if (!project?.id) return
+        setIsSaving(true)
+        setError(null)
+        try {
+            await saveRiskAnalysisToProject(project.id, risks)
+            setSaveSuccess(true)
+            setTimeout(() => setSaveSuccess(false), 3000)
+        } catch (error) {
+            console.error("Error saving risk analysis:", error)
+            setError("Failed to save risks to project")
+        } finally {
+            setIsSaving(false)
+        }
+    }
+
     const getRiskScore = (risk: Risk) => risk.probability * risk.impact
     const getRiskColor = (score: number) => {
         if (score >= 15) return "text-red-500"
@@ -157,6 +183,16 @@ export function RiskAnalysis({ project, onBack }: RiskAnalysisProps) {
                 </div>
                 <div className="flex gap-2">
                     <Button variant="outline" onClick={onBack}>Back</Button>
+                    {project && (
+                        <Button
+                            onClick={handleSaveToProject}
+                            disabled={risks.length === 0 || isSaving}
+                            variant={saveSuccess ? "default" : "outline"}
+                        >
+                            <Save className="w-4 h-4 mr-2" />
+                            {isSaving ? "Saving..." : saveSuccess ? "Saved!" : "Save to Project"}
+                        </Button>
+                    )}
                     <Button onClick={handleGenerate} disabled={isGenerating}>
                         <Sparkles className="w-4 h-4 mr-2" />
                         Auto-Detect Risks
