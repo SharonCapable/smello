@@ -10,7 +10,6 @@ import { ApiKeySetup } from "@/components/api-key-setup"
 import { MarkdownRenderer } from "@/components/markdown-renderer"
 import type { StoredProject } from "@/lib/storage"
 import { savePitchDeckToProject } from "@/lib/project-artifacts-manager"
-import { savePitchDeckToProject } from "@/lib/project-artifacts-manager"
 
 interface PitchDeckGeneratorProps {
     project?: StoredProject | null
