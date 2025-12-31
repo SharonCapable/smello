@@ -17,8 +17,8 @@ export const metadata: Metadata = {
   description: "SMELLO: Your Product Management starter pack. Prioritize features, generate ideas & user stories, manage research, and integrate with JIRA/Slack/Google Drive.",
   generator: "v0.app",
   icons: {
-    icon: '/favicon-new.png',
-    apple: '/favicon-new.png',
+    icon: '/logo.png',
+    apple: '/logo.png',
   },
 }
 
