@@ -25,11 +25,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { FolderOpen, Plus, Search, Calendar, FileText, Trash2, Download, Sparkles, Edit3 } from "lucide-react"
-import { getStoredProjects, deleteProject } from "@/lib/storage-hybrid"
+import { FolderOpen, Plus, Search, Calendar, FileText, Trash2, Download, Sparkles, Edit3, Upload } from "lucide-react"
+import { getStoredProjects, deleteProject, saveProject } from "@/lib/storage-hybrid"
 import type { StoredProject } from "@/lib/storage"
 import { EnhancedExportDialog } from "@/components/enhanced-export-dialog"
-import type { InputMode } from "@/types/user-story"
+import type { InputMode, ProjectData } from "@/types/user-story"
+import { NewProjectModal } from "@/components/new-project-modal"
+import { useToast } from "@/hooks/use-toast"
 
 interface ProjectManagerProps {
   onCreateNew: () => void
@@ -40,6 +42,8 @@ interface ProjectManagerProps {
 export function ProjectManager({ onCreateNew, onLoadProject, onModeSelect }: ProjectManagerProps) {
   const [projects, setProjects] = useState<StoredProject[]>([])
   const [searchTerm, setSearchTerm] = useState("")
+  const [showNewProjectModal, setShowNewProjectModal] = useState(false)
+  const { toast } = useToast()
 
   useEffect(() => {
     const loadProjects = async () => {
@@ -74,7 +78,6 @@ export function ProjectManager({ onCreateNew, onLoadProject, onModeSelect }: Pro
   }
 
   const getModeIcon = (project: StoredProject) => {
-    // Heuristic: if all stories have very structured content, likely AI-generated
     const hasStructuredContent = project.epics.some((epic) =>
       epic.user_stories.some(
         (story) =>
@@ -84,6 +87,38 @@ export function ProjectManager({ onCreateNew, onLoadProject, onModeSelect }: Pro
     return hasStructuredContent ? <Sparkles className="w-3 h-3" /> : <Edit3 className="w-3 h-3" />
   }
 
+  const handleCreateManualProject = async (data: { name: string; description: string; sector: string; targetAudience: string }) => {
+    try {
+      const newProject: ProjectData = {
+        product: {
+          name: data.name,
+          description: data.description,
+          sector: data.sector,
+          target_audience: data.targetAudience
+        },
+        epics: [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+
+      const saved = await saveProject(newProject)
+      setShowNewProjectModal(false)
+      onLoadProject(saved)
+
+      toast({
+        title: "Project Created",
+        description: `Project "${saved.name}" has been created successfully.`
+      })
+    } catch (error) {
+      console.error("Failed to create project:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create project.",
+        variant: "destructive"
+      })
+    }
+  }
+
   return (
     <div className="max-w-6xl mx-auto">
       <div className="mb-8">
@@ -91,7 +126,7 @@ export function ProjectManager({ onCreateNew, onLoadProject, onModeSelect }: Pro
           <h2 className="text-2xl font-bold text-foreground">Project Manager</h2>
           <div className="flex items-center gap-3">
             <Badge variant="outline">{projects.length} Projects</Badge>
-            <Button onClick={onCreateNew}>
+            <Button onClick={() => setShowNewProjectModal(true)}>
               <Plus className="w-4 h-4 mr-2" />
               New Project
             </Button>
@@ -123,13 +158,9 @@ export function ProjectManager({ onCreateNew, onLoadProject, onModeSelect }: Pro
                 <h3 className="text-lg font-semibold text-foreground mb-2">No Projects Yet</h3>
                 <p className="text-muted-foreground mb-6">Create your first user story project to get started.</p>
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <Button onClick={() => onModeSelect("ai")}>
-                    <Sparkles className="w-4 h-4 mr-2" />
-                    Generate with AI
-                  </Button>
-                  <Button variant="outline" onClick={() => onModeSelect("manual")} className="bg-transparent">
-                    <Edit3 className="w-4 h-4 mr-2" />
-                    Manual Input
+                  <Button onClick={() => setShowNewProjectModal(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create First Project
                   </Button>
                 </div>
               </>
@@ -228,6 +259,22 @@ export function ProjectManager({ onCreateNew, onLoadProject, onModeSelect }: Pro
           })}
         </div>
       )}
+
+      <NewProjectModal
+        open={showNewProjectModal}
+        onOpenChange={setShowNewProjectModal}
+        onCreateFromIdea={() => {
+          setShowNewProjectModal(false)
+          onCreateNew()
+        }}
+        onCreateFromDescription={handleCreateManualProject}
+        onCreateFromDocument={(file) => {
+          toast({
+            title: "Coming Soon",
+            description: "Document upload and parsing will be available in Phase 3.",
+          })
+        }}
+      />
     </div>
   )
 }

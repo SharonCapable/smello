@@ -365,7 +365,7 @@ export default function HomePage() {
     setExtractedProductName("")
     setExtractedDescription("")
     setParsedPdfText(null)
-    setAppState("mode-selection")
+    setAppState("idea-generator")
   }
 
   const handleIdeaProjectCreate = async (idea: any, mode: InputMode) => {
