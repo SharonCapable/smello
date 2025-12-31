@@ -42,6 +42,7 @@ import { OnboardingFlow } from "@/components/onboarding-flow"
 import { TeamDashboard } from "@/components/team-dashboard"
 import { AppHeader } from "@/components/app-header"
 import { OnboardingPathSelector } from "@/components/onboarding-path-selector"
+import { useToast } from "@/hooks/use-toast"
 
 type AppState =
   | "landing"
@@ -72,6 +73,7 @@ type AppState =
   | "risk-analysis"
 
 export default function HomePage() {
+  const { toast } = useToast()
   // Determine initial state based on storage/session
   const [appState, setAppState] = useState<AppState>("landing")
 
@@ -191,7 +193,10 @@ export default function HomePage() {
                 }))
                 // Redirect to dashboard
                 if (isTransitionState) {
-                  alert(`Welcome back, ${data.name}! We found your existing account. Redirecting you to your dashboard.`);
+                  toast({
+                    title: "Welcome back!",
+                    description: `We found your existing account, ${data.name}. Redirecting you to your dashboard.`,
+                  })
                   if (data.selectedPath === "team") {
                     setAppState("team-dashboard")
                   } else {
@@ -300,8 +305,11 @@ export default function HomePage() {
       const onboardingData = onboardingDataRaw ? JSON.parse(onboardingDataRaw) : {}
 
       if (!onboardingData.organizationId) {
-        // User hasn't set up an organization yet
-        setAppState("onboarding")
+        toast({
+          title: "Access Restricted",
+          description: "To access the Team Dashboard, you need to create an organization or accept an invite.",
+          variant: "destructive"
+        })
         return
       }
     }
