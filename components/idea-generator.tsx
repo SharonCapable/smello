@@ -223,9 +223,10 @@ Return ONLY a JSON array with this exact structure:
     }
 
     const data = await response.json()
-    const content = data.text
+    const content = data.text || data.content?.[0]?.text
 
     if (!content) {
+      console.error("Unexpected Claude response structure:", data)
       throw new Error("No content received from AI")
     }
 

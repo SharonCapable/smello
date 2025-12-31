@@ -325,6 +325,8 @@ export default function HomePage() {
       setIsGuidedMode(false);
     } else if (isGuidedMode) {
       setAppState('guided-journey');
+    } else if (currentProject) {
+      setAppState('project-view');
     } else if (appState !== 'workflow-home' && appState !== 'home') {
       setAppState('workflow-home');
     } else {
