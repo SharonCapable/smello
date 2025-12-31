@@ -52,7 +52,14 @@ async function generateTextWithClaude(prompt: string, apiKey: string | null): Pr
   }
 
   const data = await response.json()
-  return data.text
+  const content = data.text || data.content?.[0]?.text
+
+  if (!content) {
+    console.error("Unexpected Claude response structure:", data)
+    throw new Error("No content received from Claude")
+  }
+
+  return content
 }
 
 async function generateText(prompt: string, provider: 'gemini' | 'anthropic' = 'gemini'): Promise<string> {
