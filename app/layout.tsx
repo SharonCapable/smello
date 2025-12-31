@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import "./globals.css"
 
 import { FirebaseAuthBridge } from "@/components/firebase-auth-bridge"
+import { Toaster } from "@/components/ui/toaster"
 
 const notoSans = Noto_Sans({ subsets: ["latin"], variable: "--font-noto-sans", weight: ["400", "500", "700"] })
 
@@ -58,6 +59,7 @@ export default function RootLayout({
           >
             <FirebaseAuthBridge />
             <Suspense fallback={null}>{children}</Suspense>
+            <Toaster />
           </ThemeProvider>
         </body>
       </html>

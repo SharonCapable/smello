@@ -301,13 +301,24 @@ export default function HomePage() {
   const handleNavigation = (state: AppState) => {
     // Onboarding Check for Team Dashboard
     if (state === "team-dashboard") {
-      const onboardingDataRaw = localStorage.getItem("smello-user-onboarding")
-      const onboardingData = onboardingDataRaw ? JSON.parse(onboardingDataRaw) : {}
+      try {
+        const onboardingDataRaw = localStorage.getItem("smello-user-onboarding")
+        const onboardingData = onboardingDataRaw ? JSON.parse(onboardingDataRaw) : {}
 
-      if (!onboardingData.organizationId) {
+        if (!onboardingData.organizationId || onboardingData.organizationId === "undefined") {
+          toast({
+            title: "Access Restricted",
+            description: "To access the Team Dashboard, you need to create an organization or accept an invite.",
+            variant: "destructive"
+          })
+          return
+        }
+      } catch (error) {
+        console.error("Error parsing onboarding data:", error)
+        // If data is corrupt, force onboarding or just block access
         toast({
-          title: "Access Restricted",
-          description: "To access the Team Dashboard, you need to create an organization or accept an invite.",
+          title: "Error",
+          description: "Your session data seems invalid. Please try logging in again.",
           variant: "destructive"
         })
         return
