@@ -371,10 +371,10 @@ ${query.result || 'No findings available.'}
             </Label>
             <div className="space-y-2">
               <Select value={frameworkSource || 'default'} onValueChange={setFrameworkSource}>
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select framework source" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent sideOffset={5} align="start" className="w-full max-w-[calc(100vw-3rem)]">
                   <SelectItem value="default">
                     <div className="flex items-center gap-2">
                       <BookOpen className="w-4 h-4" />
