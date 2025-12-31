@@ -9,8 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { User, Mail, Briefcase, ArrowLeft, Save, Upload, CheckCircle2, Loader2 } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { User, Mail, Briefcase, Save, Upload, CheckCircle2, Loader2, Pencil } from "lucide-react"
 import { useUser } from "@clerk/nextjs"
 import { useToast } from "@/hooks/use-toast"
 
@@ -29,7 +28,6 @@ const PREDEFINED_ROLES = [
 ]
 
 export default function ProfilePage() {
-    const router = useRouter()
     const { user } = useUser()
     const { toast } = useToast()
     const [isEditing, setIsEditing] = useState(false)
@@ -106,203 +104,155 @@ export default function ProfilePage() {
         .toUpperCase()
 
     return (
-        <div className="w-full min-h-screen p-6 space-y-6 bg-background">
+        <div className="w-full h-full p-8 max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
             {/* Header */}
-            <div className="max-w-4xl mx-auto">
-                <div className="flex items-center justify-between mb-6">
-                    <Button variant="ghost" onClick={() => router.push('/')} className="gap-2">
-                        <ArrowLeft className="w-4 h-4" />
-                        Back to Dashboard
+            <div className="flex items-center justify-between border-b pb-6">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">User & Profile</h1>
+                    <p className="text-muted-foreground mt-1">Manage your personal details and workspace preferences.</p>
+                </div>
+                {!isEditing ? (
+                    <Button onClick={() => setIsEditing(true)} className="gap-2">
+                        <Pencil className="w-4 h-4" />
+                        Edit Profile
                     </Button>
-                    {!isEditing ? (
-                        <Button onClick={() => setIsEditing(true)} className="gap-2">
-                            <User className="w-4 h-4" />
-                            Edit Profile
+                ) : (
+                    <div className="flex gap-2">
+                        <Button variant="ghost" onClick={handleCancel}>
+                            Cancel
                         </Button>
-                    ) : (
-                        <div className="flex gap-2">
-                            <Button variant="outline" onClick={handleCancel}>
-                                Cancel
-                            </Button>
-                            <Button onClick={handleSave} disabled={isSaving} className="gap-2">
-                                {isSaving ? (
-                                    <>
-                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                        Saving...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Save className="w-4 h-4" />
-                                        Save Changes
-                                    </>
-                                )}
-                            </Button>
-                        </div>
-                    )}
-                </div>
-
-                <div className="text-center mb-8">
-                    <h1 className="text-4xl font-bold mb-2">Profile Settings</h1>
-                    <p className="text-muted-foreground">Manage your personal information and preferences</p>
-                </div>
+                        <Button onClick={handleSave} disabled={isSaving} className="gap-2">
+                            {isSaving ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Saving...
+                                </>
+                            ) : (
+                                <>
+                                    <Save className="w-4 h-4" />
+                                    Save Changes
+                                </>
+                            )}
+                        </Button>
+                    </div>
+                )}
             </div>
 
-            {/* Profile Content */}
-            <div className="max-w-4xl mx-auto space-y-6">
-                {/* Avatar Section */}
+            {/* Content Grid */}
+            <div className="grid gap-8">
+                {/* ID & Avatar */}
                 <Card>
                     <CardHeader>
-                        <CardTitle>Profile Picture</CardTitle>
-                        <CardDescription>Your profile picture from your Google account</CardDescription>
+                        <CardTitle>Identity</CardTitle>
+                        <CardDescription>Your digital identity across Smello.</CardDescription>
                     </CardHeader>
                     <CardContent className="flex items-center gap-6">
-                        <Avatar className="w-24 h-24 border-4 border-border">
+                        <Avatar className="w-20 h-20 border-2 border-muted">
                             <AvatarImage src={user?.imageUrl || ""} alt={profileData.name || "User"} />
-                            <AvatarFallback className="bg-accent text-accent-foreground text-2xl font-bold">
+                            <AvatarFallback className="bg-primary/10 text-primary text-xl font-bold">
                                 {userInitials}
                             </AvatarFallback>
                         </Avatar>
-                        <div className="flex-1">
-                            <p className="text-sm text-muted-foreground mb-2">
-                                Your profile picture is managed through your Google account.
-                            </p>
-                            <Button variant="outline" size="sm" disabled className="gap-2">
-                                <Upload className="w-4 h-4" />
-                                Change Picture (Coming Soon)
+                        <div className="space-y-1">
+                            <h3 className="font-medium text-lg">{profileData.name || user?.fullName || "User"}</h3>
+                            <p className="text-sm text-muted-foreground">{user?.primaryEmailAddress?.emailAddress}</p>
+                            <Button variant="outline" size="sm" disabled className="mt-2 h-8 text-xs gap-2">
+                                <Upload className="w-3 h-3" />
+                                Change Avatar
                             </Button>
                         </div>
                     </CardContent>
                 </Card>
 
-                {/* Personal Information */}
+                {/* Personal Details Form */}
                 <Card>
                     <CardHeader>
-                        <CardTitle>Personal Information</CardTitle>
-                        <CardDescription>Your basic profile details</CardDescription>
+                        <CardTitle>Details</CardTitle>
+                        <CardDescription>Your personal information.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                        {/* Name */}
-                        <div className="space-y-2">
-                            <Label htmlFor="name">Full Name</Label>
-                            {isEditing ? (
-                                <Input
-                                    id="name"
-                                    value={editedData.name || ""}
-                                    onChange={(e) => setEditedData({ ...editedData, name: e.target.value })}
-                                    placeholder="Enter your full name"
-                                />
-                            ) : (
-                                <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
-                                    <User className="w-4 h-4 text-muted-foreground" />
-                                    <span className="font-medium">{profileData.name || user?.fullName || "Not set"}</span>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Email (Read-only) */}
-                        <div className="space-y-2">
-                            <Label htmlFor="email">Email Address</Label>
-                            <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
-                                <Mail className="w-4 h-4 text-muted-foreground" />
-                                <span className="font-medium">{user?.primaryEmailAddress?.emailAddress || "Not set"}</span>
-                                <Badge variant="secondary" className="ml-auto">Verified</Badge>
+                        <div className="grid md:grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                                <Label htmlFor="name">Full Name</Label>
+                                {isEditing ? (
+                                    <Input
+                                        id="name"
+                                        value={editedData.name || ""}
+                                        onChange={(e) => setEditedData({ ...editedData, name: e.target.value })}
+                                    />
+                                ) : (
+                                    <div className="p-2.5 bg-muted/40 rounded-md text-sm border border-transparent">
+                                        {profileData.name || user?.fullName || "Not set"}
+                                    </div>
+                                )}
                             </div>
-                            <p className="text-xs text-muted-foreground">Email is managed through your Google account</p>
+                            <div className="space-y-2">
+                                <Label htmlFor="role">Role</Label>
+                                {isEditing ? (
+                                    <Select value={editedData.role} onValueChange={(val) => setEditedData({ ...editedData, role: val })}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select role" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {PREDEFINED_ROLES.map((role) => (
+                                                <SelectItem key={role} value={role}>{role}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                ) : (
+                                    <div className="p-2.5 bg-muted/40 rounded-md text-sm border border-transparent flex items-center gap-2">
+                                        <Briefcase className="w-3 h-3 text-muted-foreground" />
+                                        {profileData.role || "Not set"}
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
-                        {/* Role */}
                         <div className="space-y-2">
-                            <Label htmlFor="role">Professional Role</Label>
-                            {isEditing ? (
-                                <Select value={editedData.role} onValueChange={(val) => setEditedData({ ...editedData, role: val })}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select your role" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {PREDEFINED_ROLES.map((role) => (
-                                            <SelectItem key={role} value={role}>
-                                                {role}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            ) : (
-                                <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
-                                    <Briefcase className="w-4 h-4 text-muted-foreground" />
-                                    <span className="font-medium">{profileData.role || "Not set"}</span>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Problem/Goal Description */}
-                        <div className="space-y-2">
-                            <Label htmlFor="description">What problem are you solving?</Label>
+                            <Label htmlFor="description">Mission</Label>
                             {isEditing ? (
                                 <Textarea
                                     id="description"
                                     value={editedData.productDescription || ""}
                                     onChange={(e) => setEditedData({ ...editedData, productDescription: e.target.value })}
-                                    placeholder="Describe the problem you're trying to solve or the outcome you want to achieve"
-                                    rows={4}
+                                    placeholder="What are you building?"
+                                    rows={3}
                                 />
                             ) : (
-                                <div className="p-3 bg-muted/50 rounded-md">
-                                    <p className="text-sm">{profileData.productDescription || "Not specified"}</p>
+                                <div className="p-3 bg-muted/40 rounded-md text-sm text-muted-foreground min-h-[80px]">
+                                    {profileData.productDescription || "No mission statement set."}
                                 </div>
                             )}
+                            <p className="text-[0.8rem] text-muted-foreground">What problem are you solving?</p>
                         </div>
                     </CardContent>
                 </Card>
 
-                {/* Workspace Settings */}
+                {/* Workspace */}
                 <Card>
                     <CardHeader>
-                        <CardTitle>Workspace Settings</CardTitle>
-                        <CardDescription>Your workspace configuration</CardDescription>
+                        <CardTitle>Workspace</CardTitle>
+                        <CardDescription>Configuration for your current workspace.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                        <div className="flex items-center justify-between p-4 border rounded-lg bg-card">
                             <div>
-                                <p className="font-medium">Workspace Type</p>
-                                <p className="text-sm text-muted-foreground">Your current workspace mode</p>
+                                <div className="font-medium mb-1">Active Mode</div>
+                                <div className="text-sm text-muted-foreground">Determines the toolset available in your dashboard.</div>
                             </div>
-                            <Badge variant={profileData.usageType === "team" ? "default" : "secondary"} className="text-sm px-4 py-2">
-                                {profileData.usageType === "team" ? "Team Collaboration" : "Individual PM Tools"}
+                            <Badge variant={profileData.usageType === "team" ? "default" : "outline"} className="px-3 py-1">
+                                {profileData.usageType === "team" ? "Team Collaboration" : "PM Toolkit"}
                             </Badge>
                         </div>
-
                         {profileData.organizationName && (
-                            <div className="p-4 bg-muted/50 rounded-lg space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <p className="font-medium">Organization</p>
-                                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                            <div className="flex items-center justify-between p-4 border rounded-lg bg-card">
+                                <div>
+                                    <div className="font-medium mb-1">Organization</div>
+                                    <div className="text-sm text-muted-foreground">{profileData.organizationName}</div>
                                 </div>
-                                <p className="text-sm text-muted-foreground">{profileData.organizationName}</p>
-                                {profileData.teamName && (
-                                    <p className="text-xs text-muted-foreground">Team: {profileData.teamName}</p>
-                                )}
+                                <CheckCircle2 className="w-5 h-5 text-green-500" />
                             </div>
                         )}
-                    </CardContent>
-                </Card>
-
-                {/* Account Information */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Account Information</CardTitle>
-                        <CardDescription>Your account status and details</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="p-3 bg-muted/50 rounded-md">
-                                <p className="text-xs text-muted-foreground mb-1">Account Status</p>
-                                <Badge variant="default">Active</Badge>
-                            </div>
-                            <div className="p-3 bg-muted/50 rounded-md">
-                                <p className="text-xs text-muted-foreground mb-1">User ID</p>
-                                <p className="text-xs font-mono truncate">{user?.id || "N/A"}</p>
-                            </div>
-                        </div>
                     </CardContent>
                 </Card>
             </div>

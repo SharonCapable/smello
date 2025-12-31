@@ -8,8 +8,7 @@ import { ApiKeySetup } from '@/components/api-key-setup'
 import { AITierStatus } from '@/components/ai-tier-status'
 import { useToast } from '@/hooks/use-toast'
 import { useUser } from '@clerk/nextjs'
-import { Key, Trash2, RefreshCw, Settings, ArrowLeft, CheckCircle2 } from 'lucide-react'
-import Link from 'next/link'
+import { Key, Trash2, RefreshCw, CheckCircle2 } from 'lucide-react'
 
 function maskKey(k?: string) {
   if (!k) return 'Not set'
@@ -18,7 +17,7 @@ function maskKey(k?: string) {
 }
 
 export default function KeysSettingsPage() {
-  const { user, isLoaded, isSignedIn } = useUser()
+  const { isLoaded, isSignedIn } = useUser()
   const [keys, setKeys] = useState<{ geminiKey?: string; claudeKey?: string } | null>(null)
   const [loading, setLoading] = useState(false)
   const [showSetup, setShowSetup] = useState(false)
@@ -81,141 +80,105 @@ export default function KeysSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="w-full h-full p-8 max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
       {/* Header */}
-      <div className="border-b border-border/40 bg-background/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-6 py-4">
-          <div className="flex items-center gap-4">
-            <Link href="/">
-              <Button variant="ghost" size="sm" className="gap-2">
-                <ArrowLeft className="w-4 h-4" />
-                Back
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-xl font-bold flex items-center gap-2">
-                <Settings className="w-5 h-5" />
-                API Key Settings
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Manage your AI access and API keys
-              </p>
-            </div>
-          </div>
-        </div>
+      <div className="border-b pb-6">
+        <h1 className="text-3xl font-bold tracking-tight">API Keys</h1>
+        <p className="text-muted-foreground mt-1">Manage external AI provider credentials.</p>
       </div>
 
-      <div className="max-w-4xl mx-auto p-6 space-y-8">
-        {/* AI Tier Status - Visual Overview */}
+      <div className="grid gap-8">
+        {/* Visual Overview */}
         <AITierStatus />
 
-        {/* API Keys Management */}
-        <Card className="bg-card/50 border-border/50">
+        {/* Keys List */}
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Key className="w-5 h-5" />
-              Saved API Keys
+              <Key className="w-5 h-5 text-accent" />
+              Saved Credentials
             </CardTitle>
             <CardDescription>
-              Your stored API keys for AI generation. Keys are encrypted and stored securely.
+              Your API keys are encrypted and stored securely if you choose to sync them.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Keys Display */}
             <div className="grid md:grid-cols-2 gap-4">
-              <div className={`p-4 rounded-xl border ${keys?.geminiKey
+              <div className={`p-4 rounded-xl border transition-colors ${keys?.geminiKey
                 ? 'bg-green-500/5 border-green-500/30'
-                : 'bg-muted/20 border-border'
+                : 'bg-muted/20 border-border hover:border-border/80'
                 }`}>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium">Gemini API Key</span>
+                  <span className="font-medium">Gemini</span>
                   {keys?.geminiKey && (
-                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-green-600 bg-green-500/10 px-2 py-0.5 rounded-full">
+                      <CheckCircle2 className="w-3 h-3" />
+                      Active
+                    </div>
                   )}
                 </div>
-                <div className="font-mono text-sm text-muted-foreground">
+                <div className="font-mono text-sm text-muted-foreground bg-background/50 p-2 rounded border border-border/50">
                   {maskKey(keys?.geminiKey)}
                 </div>
               </div>
 
-              <div className={`p-4 rounded-xl border ${keys?.claudeKey
+              <div className={`p-4 rounded-xl border transition-colors ${keys?.claudeKey
                 ? 'bg-green-500/5 border-green-500/30'
-                : 'bg-muted/20 border-border'
+                : 'bg-muted/20 border-border hover:border-border/80'
                 }`}>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium">Claude API Key</span>
+                  <span className="font-medium">Claude</span>
                   {keys?.claudeKey && (
-                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-green-600 bg-green-500/10 px-2 py-0.5 rounded-full">
+                      <CheckCircle2 className="w-3 h-3" />
+                      Active
+                    </div>
                   )}
                 </div>
-                <div className="font-mono text-sm text-muted-foreground">
+                <div className="font-mono text-sm text-muted-foreground bg-background/50 p-2 rounded border border-border/50">
                   {maskKey(keys?.claudeKey)}
                 </div>
               </div>
             </div>
 
-            {/* Actions */}
-            <div className="flex flex-wrap gap-3 pt-4 border-t border-border/40">
-              <Button
-                variant="outline"
-                onClick={load}
-                disabled={loading}
-                className="gap-2"
-              >
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                Refresh
-              </Button>
-
+            <div className="flex items-center gap-3 pt-4 border-t">
               <Button
                 onClick={handleUpdate}
                 disabled={loading}
                 className="gap-2"
               >
                 <Key className="w-4 h-4" />
-                Add / Update Keys
+                Configure Keys
               </Button>
 
               <Button
-                variant="destructive"
+                variant="outline"
+                onClick={load}
+                disabled={loading}
+                className="gap-2 ml-auto"
+              >
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+
+              <Button
+                variant="ghost"
                 onClick={handleRemove}
                 disabled={loading || !isSignedIn || (!keys?.geminiKey && !keys?.claudeKey)}
-                className="gap-2"
+                className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
               >
                 <Trash2 className="w-4 h-4" />
-                Remove Keys
+                Clear
               </Button>
-            </div>
-
-            {/* Info */}
-            <div className="p-4 bg-muted/20 rounded-xl text-sm text-muted-foreground">
-              <p className="font-medium text-foreground mb-2">Getting API Keys:</p>
-              <ul className="space-y-1 list-disc list-inside">
-                <li>
-                  <strong>Gemini:</strong>{' '}
-                  <a
-                    href="https://aistudio.google.com/app/apikey"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-accent hover:underline"
-                  >
-                    Google AI Studio → Create API Key
-                  </a>
-                </li>
-                <li>
-                  <strong>Claude:</strong>{' '}
-                  <a
-                    href="https://console.anthropic.com/settings/keys"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-accent hover:underline"
-                  >
-                    Anthropic Console → API Keys
-                  </a>
-                </li>
-              </ul>
             </div>
           </CardContent>
         </Card>
+
+        {/* Info Blurb */}
+        <div className="p-4 bg-blue-500/5 border border-blue-500/10 rounded-lg text-sm text-muted-foreground">
+          <div className="font-semibold text-foreground mb-1">Why enable custom keys?</div>
+          <p>Adding your own keys bypasses shared usage limits and enables faster generation for power users.</p>
+        </div>
       </div>
 
       <ApiKeySetup

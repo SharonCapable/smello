@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
+import { useRouter } from "next/navigation"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -21,6 +22,7 @@ import { UsageCounterBadge } from "@/components/usage-counter-badge"
 import { ModeSwitcher } from "@/components/mode-switcher"
 
 export function AppHeader() {
+    const router = useRouter()
     const { user, isLoaded, isSignedIn } = useUser()
     const { signOut, openSignIn } = useClerk()
     const { theme, setTheme } = useTheme()
@@ -317,13 +319,9 @@ export function AppHeader() {
                             </div>
 
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => (window.location.href = '/settings/profile')}>
-                                <User className="w-4 h-4 mr-2" />
-                                Profile Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => (window.location.href = '/settings/keys')}>
+                            <DropdownMenuItem onClick={() => router.push('/settings/profile')}>
                                 <Settings className="w-4 h-4 mr-2" />
-                                Settings & API Keys
+                                Settings
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
