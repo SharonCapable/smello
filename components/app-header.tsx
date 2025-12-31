@@ -216,7 +216,7 @@ export function AppHeader() {
 
                 {/* Right side - User Profile */}
                 <div className="flex items-center gap-3">
-                    <DropdownMenu>
+                    <DropdownMenu key={theme}>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-9 w-9">
                                 {theme === 'dark' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}

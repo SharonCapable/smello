@@ -11,9 +11,9 @@ export default function SettingsPage() {
     return (
         <div className="w-full h-full p-6 space-y-6">
             <div className="flex items-center gap-4">
-                <Button variant="ghost" onClick={() => router.back()} className="gap-2">
+                <Button variant="ghost" onClick={() => router.push('/')} className="gap-2">
                     <ArrowLeft className="w-4 h-4" />
-                    Back
+                    Back to Dashboard
                 </Button>
                 <div>
                     <h1 className="text-3xl font-bold flex items-center gap-3">
