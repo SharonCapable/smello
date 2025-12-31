@@ -106,12 +106,32 @@ export default function HomePage() {
     // Check for temporary onboarding data (from pre-auth flow)
     const tempOnboardingData = localStorage.getItem("smello-onboarding-temp")
 
+
     if (isSignedIn && user && tempOnboardingData) {
       // User just authenticated after onboarding step 3
       const data = JSON.parse(tempOnboardingData)
+
+      // Save to permanent storage
       localStorage.setItem("smello-user-onboarding", JSON.stringify(data))
       localStorage.removeItem("smello-onboarding-temp")
 
+      // Save profile to Firestore to complete onboarding
+      fetch(`/api/profile/${user.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: data.name || user.fullName || user.firstName || 'User',
+          role: data.role,
+          selectedPath: data.usageType === 'team' ? 'team' : 'pm',
+          onboardingCompleted: true
+        })
+      }).then(() => {
+        console.log('Profile saved to Firestore after auth')
+      }).catch(err => {
+        console.error('Failed to save profile:', err)
+      })
+
+      // Redirect to appropriate dashboard
       if (data.usageType === "team") {
         setAppState("team-dashboard")
       } else {
@@ -260,7 +280,7 @@ export default function HomePage() {
     if (data.usageType === "team") {
       setAppState("team-dashboard")
     } else {
-      setAppState("settings")
+      setAppState("workflow-home") // Changed from "settings" to "workflow-home"
     }
   }
 
