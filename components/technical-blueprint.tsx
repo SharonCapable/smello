@@ -116,7 +116,10 @@ export function TechnicalBlueprint({ project, onBack }: TechnicalBlueprintProps)
             }
 
             const data = await response.json()
-            const content = data.candidates?.[0]?.content?.parts?.[0]?.text || data.text
+            // Handle both Gemini and Anthropic response formats
+            const content = data.candidates?.[0]?.content?.parts?.[0]?.text  // Gemini format
+                || data.content?.[0]?.text  // Anthropic format
+                || data.text
 
             if (content) {
                 setBlueprints(prev => {
@@ -124,6 +127,9 @@ export function TechnicalBlueprint({ project, onBack }: TechnicalBlueprintProps)
                     if (project) updateProject(project.id, { blueprints: newBlueprints })
                     return newBlueprints
                 })
+            } else {
+                console.error('No content in response:', data)
+                setError('No content generated. Please try again.')
             }
 
         } catch (error) {

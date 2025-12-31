@@ -18,7 +18,9 @@ import {
     Bell,
     Mail,
     UserPlus,
-    Folder
+    Folder,
+    Building2,
+    Home
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -122,6 +124,25 @@ export function TeamsLayout({ children, activeTab, onTabChange, organizationName
 
                 {/* Navigation */}
                 <div className="flex-1 overflow-y-auto py-4 px-3 space-y-6">
+                    {/* Organization Section */}
+                    <div className="space-y-1">
+                        {!collapsed && <div className="px-3 pb-2 text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest">Navigation</div>}
+                        <NavItem
+                            icon={Building2}
+                            label="Organization"
+                            active={activeTab === "organization"}
+                            onClick={() => onTabChange("organization")}
+                            collapsed={collapsed}
+                        />
+                        <NavItem
+                            icon={Home}
+                            label="Team Overview"
+                            active={activeTab === "team-overview"}
+                            onClick={() => onTabChange("team-overview")}
+                            collapsed={collapsed}
+                        />
+                    </div>
+
                     {/* Individual Section */}
                     <div className="space-y-1">
                         {!collapsed && <div className="px-3 pb-2 text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest">Personal</div>}

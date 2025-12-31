@@ -27,7 +27,7 @@ export default function SettingsPage() {
             <div className="grid md:grid-cols-2 gap-4 max-w-4xl">
                 <Card
                     className="cursor-pointer hover:shadow-lg hover:border-accent transition-all"
-                    onClick={() => router.push('/onboarding?mode=edit')}
+                    onClick={() => router.push('/settings/profile')}
                 >
                     <CardHeader>
                         <div className="flex items-center gap-3">
@@ -36,7 +36,7 @@ export default function SettingsPage() {
                             </div>
                             <div>
                                 <CardTitle>Profile Details</CardTitle>
-                                <CardDescription>Update your personal information and role</CardDescription>
+                                <CardDescription>View and update your personal information</CardDescription>
                             </div>
                         </div>
                     </CardHeader>

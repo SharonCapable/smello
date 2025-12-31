@@ -1,6 +1,9 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
+import type { NextRequest } from "next/server";
 
-export default clerkMiddleware();
+export function proxy(request: NextRequest) {
+  return clerkMiddleware()(request);
+}
 
 export const config = {
     matcher: [
@@ -10,3 +13,4 @@ export const config = {
         '/(api|trpc)(.*)',
     ],
 };
+

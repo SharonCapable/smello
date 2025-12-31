@@ -12,14 +12,21 @@ export function FirebaseAuthBridge() {
         const syncAuth = async () => {
             if (isSignedIn && firebaseAuth) {
                 try {
-                    // This requires the 'firebase' JWT template to be set up in Clerk Dashboard
-                    const token = await getToken({ template: "firebase" })
+                    // 1. Fetch the real Firebase Custom Token from our backend
+                    const response = await fetch('/api/auth/firebase-token')
+                    const { token, error } = await response.json()
+
+                    if (error) throw new Error(error)
+
                     if (token) {
+                        console.log("Attempting Firebase sign-in with real custom token")
                         await signInWithCustomToken(firebaseAuth, token)
-                        console.log("Firebase authenticated via Clerk")
+                        console.log("Firebase authenticated successfully")
+                    } else {
+                        console.warn("No token received from exchange API")
                     }
-                } catch (error) {
-                    console.error("Error syncing Clerk auth with Firebase:", error)
+                } catch (error: any) {
+                    console.error("Error syncing auth:", error)
                 }
             }
         }

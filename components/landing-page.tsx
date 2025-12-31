@@ -52,13 +52,13 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
                         </div>
 
                         <h1 className="text-6xl md:text-7xl lg:text-8xl font-bold tracking-tight animate-fade-in-up animation-delay-200 leading-[1.1]">
-                            Turn Ideas into Products <br />
-                            <span className="bg-gradient-to-r from-accent via-purple-500 to-pink-500 bg-clip-text text-transparent">Collaborate & Launch</span>
+                            Your Complete Product <br />
+                            <span className="bg-gradient-to-r from-accent via-purple-500 to-pink-500 bg-clip-text text-transparent">Toolkit & Workspace</span>
                         </h1>
 
                         <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto animate-fade-in-up animation-delay-400 leading-relaxed">
-                            The all-in-one workspace where Product Managers and Teams come together.
-                            From instant ideation to roadmap planning and technical execution.
+                            The all-in-one platform combining powerful PM tools with collaborative project management.
+                            Generate PRDs, build roadmaps, manage teams, and ship products faster.
                         </p>
 
                         <div className="flex flex-col sm:flex-row gap-4 justify-center pt-8 animate-fade-in-up animation-delay-600">

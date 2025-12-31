@@ -1,14 +1,6 @@
 import { NextResponse } from 'next/server'
-import admin from 'firebase-admin'
+import admin, { initAdmin } from '@/lib/firebase-admin'
 import { auth } from '@clerk/nextjs/server'
-
-function initAdmin() {
-    if (admin.apps && admin.apps.length) return
-    const raw = process.env.FIREBASE_SERVICE_ACCOUNT
-    if (!raw) throw new Error('FIREBASE_SERVICE_ACCOUNT is not set')
-    const serviceAccount = typeof raw === 'string' ? JSON.parse(raw) : raw
-    admin.initializeApp({ credential: admin.credential.cert(serviceAccount as any) })
-}
 
 export async function POST() {
     try {

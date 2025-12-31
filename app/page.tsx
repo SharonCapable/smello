@@ -41,9 +41,11 @@ import { LandingPage } from "@/components/landing-page"
 import { OnboardingFlow } from "@/components/onboarding-flow"
 import { TeamDashboard } from "@/components/team-dashboard"
 import { AppHeader } from "@/components/app-header"
+import { OnboardingPathSelector } from "@/components/onboarding-path-selector"
 
 type AppState =
   | "landing"
+  | "path-selection"
   | "onboarding"
   | "team-dashboard"
   | "workflow-home"
@@ -188,7 +190,8 @@ export default function HomePage() {
       }
     } else {
       // No session. 
-      if (appState !== "landing" && appState !== "onboarding") {
+      // Allow landing, path-selection, and onboarding states for unauthenticated users
+      if (appState !== "landing" && appState !== "onboarding" && appState !== "path-selection") {
         setAppState("landing")
       }
       setIsCheckingProfile(false)
@@ -222,6 +225,33 @@ export default function HomePage() {
   }, [parsedPdfText, entryMode, showEditableExtract]);
 
   const handleGetStarted = () => {
+    // If user is already signed in, redirect to their dashboard
+    if (isSignedIn && user) {
+      const onboardingData = localStorage.getItem("smello-user-onboarding")
+      if (onboardingData) {
+        const data = JSON.parse(onboardingData)
+        if (data.usageType === "team") {
+          setAppState("team-dashboard")
+        } else {
+          setAppState("workflow-home")
+        }
+        return
+      }
+    }
+    // Otherwise, proceed to path selection
+    setAppState("path-selection")
+  }
+
+  const handlePathSelect = (path: 'pm' | 'teams') => {
+    const usageType = path === 'pm' ? 'personal' : 'team'
+
+    // Pre-seed the onboarding data with the selected type
+    const existingData = JSON.parse(localStorage.getItem("smello-user-onboarding") || "{}")
+    localStorage.setItem("smello-user-onboarding", JSON.stringify({
+      ...existingData,
+      usageType
+    }))
+
     setAppState("onboarding")
   }
 
@@ -250,6 +280,7 @@ export default function HomePage() {
       const onboardingData = onboardingDataRaw ? JSON.parse(onboardingDataRaw) : {}
 
       if (!onboardingData.organizationId) {
+        // User hasn't set up an organization yet
         setAppState("onboarding")
         return
       }
@@ -431,13 +462,20 @@ export default function HomePage() {
     return <LandingPage onGetStarted={handleGetStarted} />
   }
 
+  if (appState === "path-selection") {
+    return <OnboardingPathSelector onSelectPath={handlePathSelect} />
+  }
+
   if (appState === "onboarding") {
     const existingData = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("smello-user-onboarding") || "{}") : {}
+    const needsTeamSetup = existingData.usageType === "team" && !existingData.organizationId
+
     return <OnboardingFlow
       onComplete={handleOnboardingComplete}
       isAuthenticated={!!isSignedIn}
-      onBack={() => setAppState("landing")}
+      onBack={() => setAppState("path-selection")}
       initialData={existingData}
+      initialStep={needsTeamSetup ? 5 : 1}
     />
   }
 

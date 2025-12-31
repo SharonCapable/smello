@@ -1,16 +1,8 @@
 import { NextResponse } from 'next/server'
-import admin from 'firebase-admin'
+import admin, { initAdmin } from '@/lib/firebase-admin'
 import { auth } from '@clerk/nextjs/server'
 import { decryptText } from '@/lib/crypto'
-import { refreshGoogleAccessToken } from '@/lib/oauth'
 
-function initAdmin() {
-  if (admin.apps && admin.apps.length) return
-  const raw = process.env.FIREBASE_SERVICE_ACCOUNT
-  if (!raw) throw new Error('FIREBASE_SERVICE_ACCOUNT is not set')
-  const serviceAccount = typeof raw === 'string' ? JSON.parse(raw) : raw
-  admin.initializeApp({ credential: admin.credential.cert(serviceAccount as any) })
-}
 
 export async function POST(req: Request) {
   try {
@@ -20,8 +12,8 @@ export async function POST(req: Request) {
     if (!provider || !prompt) return NextResponse.json({ error: 'missing_parameters' }, { status: 400 })
 
     // Attempt to resolve per-provider API key following priority:
-    // 1) Server env key
-    // 2) Authenticated user's Google OAuth access token (for Gemini)
+    // 1) Server env key (with free tier limit)
+    // 2) User's Google OAuth access token from Clerk (for Gemini)
     // 3) Per-user stored API key in Firestore (apiKeys collection)
     // 4) Client-provided key
 
@@ -29,18 +21,7 @@ export async function POST(req: Request) {
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 })
 
-    // Attempt to extract meaningful user ID, fallback to email or something stable. 
-    // If we can't get a user ID, we can't enforce personalized limits properly, 
-    // but blocking them might be worse. Let's try best effort.
     const sessionUid = userId
-
-    // Clerk's auth() does not directly provide sessionAccessToken, sessionRefreshToken, sessionExpiresAt.
-    // These would typically come from a database lookup or a custom session management if needed with Clerk.
-    // For now, setting them to null to avoid breaking existing logic that might rely on them being defined,
-    // but the Google OAuth refresh logic will likely need to be re-evaluated or removed if these are not available.
-    const sessionAccessToken = null
-    const sessionRefreshToken = null
-    const sessionExpiresAt = null
 
     // If user is authenticated we can attempt to fetch their stored keys
     let storedKeys: { geminiKey?: string; claudeKey?: string } | null = null
@@ -75,7 +56,38 @@ export async function POST(req: Request) {
           const statsRef = db.collection('usageStats').doc(sessionUid)
           const statsSnap = await statsRef.get()
           const FREE_LIMIT = Number(process.env.FREE_AI_OPERATIONS_LIMIT || 6)
-          const current = statsSnap.exists ? (statsSnap.data()?.operationCount || 0) : 0
+
+          let current = 0
+          let lastReset: Date | null = null
+
+          if (statsSnap.exists) {
+            const data = statsSnap.data()
+            current = data?.operationCount || 0
+            lastReset = data?.lastReset?.toDate() || data?.updatedAt?.toDate() || null
+          }
+
+          // Check if 24 hours have passed since last reset
+          const now = new Date()
+          let shouldReset = false
+
+          if (lastReset) {
+            const hoursSinceReset = (now.getTime() - lastReset.getTime()) / (1000 * 60 * 60)
+            if (hoursSinceReset >= 24) {
+              shouldReset = true
+              console.log(`Resetting usage counter for user ${sessionUid} (${hoursSinceReset.toFixed(1)} hours since last reset)`)
+            }
+          }
+
+          if (shouldReset) {
+            // Reset the counter
+            await statsRef.set({
+              userId: sessionUid,
+              operationCount: 0,
+              lastReset: admin.firestore.FieldValue.serverTimestamp(),
+              updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            }, { merge: true })
+            current = 0
+          }
 
           if (current >= FREE_LIMIT) {
             console.log(`User ${sessionUid} exceeded free limit (server key skipped): ${current}/${FREE_LIMIT}`)
@@ -83,7 +95,13 @@ export async function POST(req: Request) {
             // Don't return yet - try user's own keys first
           } else {
             // Increment and Use
-            await statsRef.set({ userId: sessionUid, operationCount: admin.firestore.FieldValue.increment(1), updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true })
+            await statsRef.set({
+              userId: sessionUid,
+              operationCount: admin.firestore.FieldValue.increment(1),
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              // Set lastReset if this is the first use
+              ...(current === 0 && !lastReset ? { lastReset: admin.firestore.FieldValue.serverTimestamp() } : {})
+            }, { merge: true })
 
             const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent', {
               method: 'POST',
@@ -107,39 +125,37 @@ export async function POST(req: Request) {
         }
       }
 
-      // 2. OAuth Token (Gemini specific)
+      // 2. OAuth Token (Gemini specific) - Try Clerk OAuth
       // Only runs if server key was missing or limit exceeded
+      try {
+        // Import clerkClient dynamically to get OAuth token
+        const { clerkClient } = await import('@clerk/nextjs/server')
+        const client = await clerkClient()
 
-      if (sessionAccessToken) {
-        let accessTokenToUse = sessionAccessToken
-        try {
-          const now = Math.floor(Date.now() / 1000)
-          if (sessionExpiresAt && Number(sessionExpiresAt) <= now && sessionRefreshToken) {
-            try {
-              const refreshed = await refreshGoogleAccessToken(sessionRefreshToken)
-              accessTokenToUse = refreshed.access_token
-            } catch (e) {
-              console.warn('google refresh failed', e)
+        const oauthTokens = await client.users.getUserOauthAccessToken(sessionUid, 'google')
+
+        if (oauthTokens && oauthTokens.data.length > 0) {
+          const accessTokenToUse = oauthTokens.data[0].token
+
+          if (accessTokenToUse) {
+            const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessTokenToUse}` },
+              body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.7 } }),
+            })
+
+            if (response.ok) {
+              const data = await response.json()
+              return NextResponse.json(data)
+            } else {
+              // OAuth token might not have the right scopes, fall through to next option
+              console.log('OAuth token failed for Gemini, trying next method')
             }
           }
-
-          const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessTokenToUse}` },
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.7 } }),
-          })
-
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}))
-            return NextResponse.json({ error: errorData.error?.message || 'Gemini API Error' }, { status: response.status })
-          }
-
-          const data = await response.json()
-          return NextResponse.json(data)
-        } catch (e: any) {
-          console.error('generate gemini with oauth error', e)
-          // Fallthrough to next key sources (stored key / client key)
         }
+      } catch (e: any) {
+        console.log('OAuth token not available or invalid:', e.message)
+        // Fallthrough to next key sources (stored key / client key)
       }
 
       // 3. Stored user key
@@ -221,12 +237,49 @@ export async function POST(req: Request) {
           const statsRef = db.collection('usageStats').doc(sessionUid)
           const statsSnap = await statsRef.get()
           const FREE_LIMIT = Number(process.env.FREE_AI_OPERATIONS_LIMIT || 6)
-          const current = statsSnap.exists ? (statsSnap.data()?.operationCount || 0) : 0
-          if (current >= FREE_LIMIT) {
-            return NextResponse.json({ error: 'free_limit_exceeded', remaining: 0 }, { status: 403 })
+
+          let current = 0
+          let lastReset: Date | null = null
+
+          if (statsSnap.exists) {
+            const data = statsSnap.data()
+            current = data?.operationCount || 0
+            lastReset = data?.lastReset?.toDate() || data?.updatedAt?.toDate() || null
           }
+
+          // Check if 24 hours have passed since last reset
+          const now = new Date()
+          let shouldReset = false
+
+          if (lastReset) {
+            const hoursSinceReset = (now.getTime() - lastReset.getTime()) / (1000 * 60 * 60)
+            if (hoursSinceReset >= 24) {
+              shouldReset = true
+              console.log(`Resetting usage counter for user ${sessionUid} (Anthropic) (${hoursSinceReset.toFixed(1)} hours since last reset)`)
+            }
+          }
+
+          if (shouldReset) {
+            await statsRef.set({
+              userId: sessionUid,
+              operationCount: 0,
+              lastReset: admin.firestore.FieldValue.serverTimestamp(),
+              updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            }, { merge: true })
+            current = 0
+          }
+
+          if (current >= FREE_LIMIT) {
+            return NextResponse.json({ error: 'free_limit_exceeded', remaining: 0, message: 'Free trial limit exceeded. Please add your own API key.' }, { status: 403 })
+          }
+
           // increment counter by one for this generation action
-          await statsRef.set({ userId: sessionUid, operationCount: admin.firestore.FieldValue.increment(1), updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true })
+          await statsRef.set({
+            userId: sessionUid,
+            operationCount: admin.firestore.FieldValue.increment(1),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            ...(current === 0 && !lastReset ? { lastReset: admin.firestore.FieldValue.serverTimestamp() } : {})
+          }, { merge: true })
 
           const response = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
@@ -235,7 +288,7 @@ export async function POST(req: Request) {
               'x-api-key': envKey,
               'anthropic-version': '2023-06-01',
             },
-            body: JSON.stringify({ model: model || 'claude-3-5-sonnet-latest', max_tokens: 4096, messages: [{ role: 'user', content: prompt }] }),
+            body: JSON.stringify({ model: model || 'claude-haiku-4-5', max_tokens: 4096, messages: [{ role: 'user', content: prompt }] }),
           })
 
           if (!response.ok) {
@@ -260,7 +313,7 @@ export async function POST(req: Request) {
             'x-api-key': storedKey,
             'anthropic-version': '2023-06-01',
           },
-          body: JSON.stringify({ model: model || 'claude-3-5-sonnet-latest', max_tokens: 4096, messages: [{ role: 'user', content: prompt }] }),
+          body: JSON.stringify({ model: model || 'claude-haiku-4-5', max_tokens: 4096, messages: [{ role: 'user', content: prompt }] }),
         })
 
         if (!response.ok) {
@@ -283,7 +336,7 @@ export async function POST(req: Request) {
           'x-api-key': apiKey,
           'anthropic-version': '2023-06-01',
         },
-        body: JSON.stringify({ model: model || 'claude-3-5-sonnet-latest', max_tokens: 4096, messages: [{ role: 'user', content: prompt }] }),
+        body: JSON.stringify({ model: model || 'claude-haiku-4-5', max_tokens: 4096, messages: [{ role: 'user', content: prompt }] }),
       })
 
       if (!response.ok) {

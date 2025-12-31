@@ -8,7 +8,10 @@ export async function POST(req: Request) {
             return NextResponse.json({ valid: false, error: "API key is required" }, { status: 400 })
         }
 
-        if (provider === "gemini") {
+        // Normalize provider names - accept 'google' as alias for 'gemini'
+        const normalizedProvider = provider === 'google' ? 'gemini' : provider
+
+        if (normalizedProvider === "gemini") {
             // Validate Gemini Key by making a small generation request using header-based API key
             const response = await fetch(
                 "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent",
@@ -31,7 +34,7 @@ export async function POST(req: Request) {
                 const data = await response.json().catch(() => ({}))
                 return NextResponse.json({ valid: false, error: data.error?.message || "Invalid Gemini API key" })
             }
-        } else if (provider === "anthropic") {
+        } else if (normalizedProvider === "anthropic") {
             // Validate Claude Key
             const response = await fetch("https://api.anthropic.com/v1/messages", {
                 method: "POST",

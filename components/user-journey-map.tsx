@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Map, Plus, Trash2, Sparkles, ArrowRight, Smile, Frown, Meh } from "lucide-react"
+import { Map, Plus, Trash2, Sparkles, ArrowRight, Smile, Frown, Meh, Loader2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 import { Slider } from "@/components/ui/slider"
 import { ApiKeyManager } from "@/lib/api-key-manager"
 import { ApiKeySetup } from "@/components/api-key-setup"
@@ -37,6 +38,7 @@ const DEFAULT_STAGES = [
 ]
 
 export function UserJourneyMap({ project, onBack }: UserJourneyMapProps) {
+    const { toast } = useToast()
     const [stages, setStages] = useState<JourneyStage[]>(
         DEFAULT_STAGES.map(s => ({
             id: crypto.randomUUID(),
@@ -133,6 +135,8 @@ export function UserJourneyMap({ project, onBack }: UserJourneyMapProps) {
 
             const data = await response.json()
             const content = data.candidates?.[0]?.content?.parts?.[0]?.text
+                || data.content?.[0]?.text
+                || data.text
 
             if (content) {
                 const cleanedText = content.replace(/```json\n?|\n?```/g, "").trim()
@@ -153,7 +157,13 @@ export function UserJourneyMap({ project, onBack }: UserJourneyMapProps) {
 
         } catch (error) {
             console.error("Error generating journey:", error)
-            setError(error instanceof Error ? error.message : "Failed to generate content")
+            const msg = error instanceof Error ? error.message : "Failed to generate content"
+            setError(msg)
+            toast({
+                title: "Generation Failed",
+                description: msg,
+                variant: "destructive",
+            })
         } finally {
             setIsGenerating(false)
         }
@@ -212,8 +222,17 @@ export function UserJourneyMap({ project, onBack }: UserJourneyMapProps) {
                         </Button>
                     )}
                     <Button onClick={handleGenerate} disabled={isGenerating}>
-                        <Sparkles className="w-4 h-4 mr-2" />
-                        Auto-Generate Journey
+                        {isGenerating ? (
+                            <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Generating...
+                            </>
+                        ) : (
+                            <>
+                                <Sparkles className="w-4 h-4 mr-2" />
+                                Auto-Generate Journey
+                            </>
+                        )}
                     </Button>
                 </div>
             </div>

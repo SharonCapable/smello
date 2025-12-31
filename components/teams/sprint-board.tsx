@@ -15,6 +15,7 @@ import {
     Search,
     ChevronDown,
     ChevronRight,
+    ChevronLeft,
     User as UserIcon,
     Zap,
     GripVertical
@@ -302,7 +303,22 @@ export function SprintBoard({ tasks, onUpdateTask, orgId, teamId }: SprintBoardP
                                                 )}
                                             </div>
                                             <div className="flex gap-1">
-                                                {/* Simple status move buttons for now */}
+                                                {/* Back button - move to previous status */}
+                                                {col.id !== "Backlog" && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="icon"
+                                                        className="h-6 w-6 rounded-md hover:bg-orange-500/10 hover:text-orange-500 hover:border-orange-500/20"
+                                                        onClick={() => {
+                                                            const prevStatus = col.id === "Done" ? "Review" :
+                                                                col.id === "Review" ? "In Progress" : "Backlog"
+                                                            handleStatusMove(task.id, prevStatus)
+                                                        }}
+                                                    >
+                                                        <ChevronLeft className="w-3 h-3" />
+                                                    </Button>
+                                                )}
+                                                {/* Forward button - move to next status */}
                                                 {col.id !== "Done" && (
                                                     <Button
                                                         variant="outline"

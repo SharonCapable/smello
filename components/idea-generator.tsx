@@ -14,6 +14,7 @@ import { ApiKeySetup } from "@/components/api-key-setup"
 import { GlobalUsageCounter } from "@/lib/global-usage-counter"
 import type { InputMode } from "@/types/user-story"
 import { Textarea } from "@/components/ui/textarea"
+import { useToast } from "@/hooks/use-toast"
 
 interface IdeaGeneratorProps {
   onCreateProject: (idea: GeneratedIdea, mode: InputMode) => void
@@ -56,6 +57,7 @@ export function IdeaGenerator({ onCreateProject, onBack }: IdeaGeneratorProps) {
   const [showApiKeySetup, setShowApiKeySetup] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedModel, setSelectedModel] = useState<'Gemini' | 'Claude'>('Gemini');
+  const { toast } = useToast()
 
   /* New useEffect to persist ideas state */
   useEffect(() => {
@@ -84,6 +86,8 @@ export function IdeaGenerator({ onCreateProject, onBack }: IdeaGeneratorProps) {
     }
   }, [generatedIdeas, editableIdeas, keyword, selectedSector]);
 
+
+
   const handleGenerate = async () => {
     // Delegate quota enforcement to the server; do not block client-side.
     setIsGenerating(true)
@@ -104,7 +108,13 @@ export function IdeaGenerator({ onCreateProject, onBack }: IdeaGeneratorProps) {
 
     } catch (error) {
       console.error("Error generating ideas:", error)
-      setError(error instanceof Error ? error.message : "Failed to generate ideas")
+      const errorMessage = error instanceof Error ? error.message : "Failed to generate ideas"
+      setError(errorMessage)
+      toast({
+        title: "Generation Failed",
+        description: errorMessage,
+        variant: "destructive"
+      })
     } finally {
       setIsGenerating(false)
     }
@@ -159,6 +169,8 @@ Return ONLY a JSON array with this exact structure:
 
     const data = await response.json()
     const content = data.candidates?.[0]?.content?.parts?.[0]?.text
+      || data.content?.[0]?.text
+      || data.text
 
     if (!content) {
       throw new Error("No content received from AI")

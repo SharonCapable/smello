@@ -49,57 +49,86 @@ interface OnboardingFlowProps {
     onBack: () => void
     initialData?: Partial<OnboardingData>
     isEditMode?: boolean
+    initialStep?: 1 | 2 | 3 | 4 | 5
 }
 
-export function OnboardingFlow({ onComplete, isAuthenticated, onBack, initialData, isEditMode = false }: OnboardingFlowProps) {
-    const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1)
+export function OnboardingFlow({ onComplete, isAuthenticated, onBack, initialData, isEditMode = false, initialStep }: OnboardingFlowProps) {
+    const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(initialStep || 1)
+    const { user } = useUser()
+
+    // Auto-populate name from Clerk user
+    const userName = user?.fullName || user?.firstName || initialData?.name || ""
+
     const [data, setData] = useState<OnboardingData>({
-        name: initialData?.name || "",
+        name: userName, // Use Clerk's name
         role: initialData?.role || "",
         productDescription: initialData?.productDescription || "",
         usageType: initialData?.usageType || "personal",
         organizationName: initialData?.organizationName || "",
         teamName: initialData?.teamName || ""
     })
+    const [isPrivileged, setIsPrivileged] = useState(false)
+    const [foundOrg, setFoundOrg] = useState<any>(null)
+    const [orgTeams, setOrgTeams] = useState<any[]>([])
+    const [isSearchingOrg, setIsSearchingOrg] = useState(false)
     const [isSigningIn, setIsSigningIn] = useState(false)
     const [isCompleting, setIsCompleting] = useState(false)
     const { openSignIn } = useClerk()
-    const { user } = useUser()
     const { toast } = useToast()
 
-    // Auto-advance if we have initial data from PM path
+    // Check if user is super admin
     useEffect(() => {
-        if (initialData?.name && initialData?.role && step === 1) {
-            setStep(3)
+        const checkAdmin = async () => {
+            if (user) {
+                const { isSuperAdmin } = await import("@/lib/firestore-service")
+                const result = await isSuperAdmin(user.id)
+                setIsPrivileged(result)
+            }
         }
-    }, [initialData, step])
+        checkAdmin()
+    }, [user])
 
-    // Skip step 3 if already authenticated, but show a "Finishing up" state
+    // Search for organization when name changes (if not privileged)
     useEffect(() => {
-        if (isAuthenticated && step === 3) {
-            // If we reach step 3 and are already authenticated, we can optionally 
-            // just show a "Confirm" button instead of "Sign In"
-            // or auto-complete. Let's show a "Complete Setup" button.
+        const searchOrg = async () => {
+            if (!isPrivileged && data.organizationName && data.organizationName.length > 2 && step === 5) {
+                setIsSearchingOrg(true)
+                try {
+                    const { findOrganizationByName, getOrganizationTeams } = await import("@/lib/firestore-service")
+                    const org = await findOrganizationByName(data.organizationName)
+                    setFoundOrg(org)
+                    if (org) {
+                        const teams = await getOrganizationTeams(org.id)
+                        setOrgTeams(teams)
+                    } else {
+                        setOrgTeams([])
+                    }
+                } catch (e) {
+                    console.error("Search failed", e)
+                } finally {
+                    setIsSearchingOrg(false)
+                }
+            } else {
+                setFoundOrg(null)
+                setOrgTeams([])
+            }
         }
-    }, [isAuthenticated, step])
+        const timer = setTimeout(searchOrg, 500)
+        return () => clearTimeout(timer)
+    }, [data.organizationName, isPrivileged, step])
 
     const handleNext = () => {
-        if (step === 1 && data.name && data.role) {
+        // Step 1: Only require role (name is auto-populated from Clerk)
+        if (step === 1 && data.role) {
             setStep(2)
-        } else if (step === 2 && data.productDescription) {
-            setStep(3)
-        } else if (step === 3) {
-            // If they are upgrading to team mode from PM mode
-            if (data.usageType === "team") {
-                setStep(4)
-            } else {
-                setStep(4)
-            }
+        } else if (step === 2) {
+            // Step 2 (Problem/Outcome) is now optional for faster setup
+            setStep(4) // Skip step 3 (usage type selection) as it was picked in Path Selection
         } else if (step === 4) {
             if (data.usageType === "team") {
                 setStep(5)
             } else {
-                // handleFinishSetup will be called via button
+                handleFinishSetup()
             }
         }
     }
@@ -115,20 +144,49 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack, initialDat
         try {
             let resultData = { ...data }
 
-            if (data.usageType === "team" && data.organizationName && data.teamName && user) {
-                // Create real Org and Team in Firestore
-                console.log('Creating organization:', data.organizationName)
-                const orgId = await createOrganization(user.id, data.organizationName)
-                console.log('Organization created:', orgId)
+            if (data.usageType === "team" && user) {
+                const { createOrganization, createTeam, joinOrganizationWithTeam } = await import("@/lib/firestore-service")
 
-                console.log('Creating team:', data.teamName)
-                const teamId = await createTeam(orgId, data.teamName, user.id)
-                console.log('Team created:', teamId)
+                if (isPrivileged) {
+                    // Create real Org and Team in Firestore
+                    console.log('Creating organization:', data.organizationName)
+                    const orgId = await createOrganization(
+                        user.id,
+                        data.organizationName!,
+                        user.primaryEmailAddress?.emailAddress || "",
+                        user.fullName || user.firstName || "User"
+                    )
+                    console.log('Organization created:', orgId)
 
-                resultData = {
-                    ...resultData,
-                    organizationId: orgId,
-                    teamId: teamId
+                    console.log('Creating team:', data.teamName)
+                    const teamId = await createTeam(orgId, data.teamName!, "Initial team", user.id)
+                    console.log('Team created:', teamId)
+
+                    resultData = {
+                        ...resultData,
+                        organizationId: orgId,
+                        teamId: teamId
+                    }
+                } else if (foundOrg && data.teamId) {
+                    // Join existing Org and Team
+                    console.log('Joining organization:', foundOrg.name)
+                    await joinOrganizationWithTeam(
+                        foundOrg.id,
+                        data.teamId,
+                        user.id,
+                        user.primaryEmailAddress?.emailAddress || "",
+                        user.fullName || user.firstName || "User"
+                    )
+
+                    resultData = {
+                        ...resultData,
+                        organizationId: foundOrg.id,
+                        organizationName: foundOrg.name,
+                        teamId: data.teamId,
+                        teamName: orgTeams.find(t => t.id === data.teamId)?.name || ""
+                    }
+                } else {
+                    throw new Error("Only super admins can create organizations. Please select an existing organization and team to join.")
                 }
             }
 
@@ -154,35 +212,28 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack, initialDat
                     <CardTitle className="text-3xl font-bold">
                         {step === 1 ? (isEditMode ? "Update Your Profile" : "Welcome to SMELLO") :
                             step === 2 ? "What's the problem you're solving?" :
-                                step === 3 ? "Choose Your Path" :
-                                    step === 4 ? (isAuthenticated ? (isEditMode ? "Confirm Updates" : "Identity Verified") : "Create Your Account") :
-                                        "Setup Your Team"}
+                                step === 4 ? (isAuthenticated ? (isEditMode ? "Confirm Updates" : "Identity Verified") : "Create Your Account") :
+                                    "Setup Your Team"}
                     </CardTitle>
                     <CardDescription className="text-lg">
                         {step === 1 ? (isEditMode ? "Update your personal details" : "Let's get to know you better") :
-                            step === 2 ? "Tell us the problem or outcome you want to achieve" :
-                                step === 3 ? "How do you plan to use Smello?" :
-                                    step === 4 ? (isAuthenticated ? (isEditMode ? "Ready to save your changes?" : "You're authenticated!") : "Secure your workspace to continue") :
-                                        "Define your organization and team workspace"}
+                            step === 2 ? "Tell us the problem or outcome you want to achieve (Optional)" :
+                                step === 4 ? (isAuthenticated ? (isEditMode ? "Ready to save your changes?" : "You're authenticated!") : "Secure your workspace to continue") :
+                                    "Define your organization and team workspace"}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-8">
                     {step === 1 && (
                         <div className="space-y-6 animate-fade-in-up">
-                            <div className="space-y-2">
-                                <Label htmlFor="name" className="text-base">What should we call you?</Label>
-                                <div className="relative">
-                                    <User className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
-                                    <Input
-                                        id="name"
-                                        placeholder="Your Name"
-                                        className="pl-10 h-12 text-lg"
-                                        value={data.name}
-                                        onChange={(e) => setData({ ...data, name: e.target.value })}
-                                        autoFocus
-                                    />
+                            {/* Show welcome message with user's name if available */}
+                            {userName && (
+                                <div className="p-4 bg-accent/10 rounded-lg border border-accent/20 mb-4">
+                                    <p className="text-sm text-center">
+                                        Welcome, <span className="font-semibold">{userName}</span>! 👋
+                                    </p>
                                 </div>
-                            </div>
+                            )}
+
                             <div className="space-y-2">
                                 <Label htmlFor="role" className="text-base">What is your role?</Label>
                                 <Select value={data.role} onValueChange={(val) => setData({ ...data, role: val })}>
@@ -362,50 +413,101 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack, initialDat
                     {step === 5 && (
                         <div className="space-y-6 animate-fade-in-up">
                             <div className="space-y-2">
-                                <Label htmlFor="org" className="text-base">Organization Name</Label>
+                                <Label htmlFor="org" className="text-base">
+                                    {isPrivileged ? "Organization Name" : "Search Organization to Join"}
+                                </Label>
                                 <div className="relative">
                                     <Building2 className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
                                     <Input
                                         id="org"
-                                        placeholder="e.g. Acme Corp"
+                                        placeholder={isPrivileged ? "e.g. Acme Corp" : "Type organization name..."}
                                         className="pl-10 h-12 text-lg"
                                         value={data.organizationName}
                                         onChange={(e) => setData({ ...data, organizationName: e.target.value })}
                                         autoFocus
                                     />
+                                    {isSearchingOrg && (
+                                        <Loader2 className="absolute right-3 top-3 h-5 w-5 animate-spin text-muted-foreground" />
+                                    )}
                                 </div>
+                                {!isPrivileged && data.organizationName && data.organizationName.length > 2 && !foundOrg && !isSearchingOrg && (
+                                    <p className="text-xs text-destructive">Organization not found. Only Super Admins can create new organizations.</p>
+                                )}
+                                {!isPrivileged && foundOrg && (
+                                    <p className="text-xs text-green-500 flex items-center gap-1">
+                                        <CheckCircle2 className="w-3 h-3" /> Found: {foundOrg.name} ({foundOrg.domain || 'no domain'})
+                                    </p>
+                                )}
                             </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="team" className="text-base">Your Team Name</Label>
-                                <div className="relative">
-                                    <Users className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
-                                    <Input
-                                        id="team"
-                                        placeholder="e.g. Product Team B"
-                                        className="pl-10 h-12 text-lg"
-                                        value={data.teamName}
-                                        onChange={(e) => setData({ ...data, teamName: e.target.value })}
-                                    />
+
+                            {isPrivileged ? (
+                                <div className="space-y-2">
+                                    <Label htmlFor="team" className="text-base">Your Team Name</Label>
+                                    <div className="relative">
+                                        <Users className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
+                                        <Input
+                                            id="team"
+                                            placeholder="e.g. Product Team B"
+                                            className="pl-10 h-12 text-lg"
+                                            value={data.teamName}
+                                            onChange={(e) => setData({ ...data, teamName: e.target.value })}
+                                        />
+                                    </div>
                                 </div>
-                            </div>
+                            ) : foundOrg && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="team-select" className="text-base">Select Team to Join</Label>
+                                    <Select value={data.teamId} onValueChange={(val) => setData({ ...data, teamId: val })}>
+                                        <SelectTrigger id="team-select" className="h-12 text-lg">
+                                            <div className="flex items-center gap-2">
+                                                <Users className="h-5 w-5 text-muted-foreground" />
+                                                <SelectValue placeholder="Select a team" />
+                                            </div>
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {orgTeams.map((team) => (
+                                                <SelectItem key={team.id} value={team.id} className="text-base">
+                                                    {team.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
+
                             <Button
                                 size="lg"
                                 className="w-full h-12 text-base mt-4"
                                 onClick={handleFinishSetup}
-                                disabled={isCompleting || !data.organizationName || !data.teamName}
+                                disabled={
+                                    isCompleting ||
+                                    (isPrivileged ? (!data.organizationName || !data.teamName) : (!foundOrg || !data.teamId))
+                                }
                             >
                                 {isCompleting ? (
                                     <>
                                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                        Building your workspace...
+                                        {isPrivileged ? "Building your workspace..." : "Joining workspace..."}
                                     </>
                                 ) : (
                                     <>
-                                        Finish Setup
+                                        {isPrivileged ? "Finish Setup" : "Join Organization"}
                                         <ArrowRight className="w-4 h-4 ml-2" />
                                     </>
                                 )}
                             </Button>
+
+                            {!isPrivileged && !foundOrg && data.organizationName && data.organizationName.length > 2 && (
+                                <div className="text-center pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={onBack}
+                                        className="text-sm text-muted-foreground hover:text-accent underline transition-colors"
+                                    >
+                                        Can't find your organization? Choose a different workflow
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -413,9 +515,14 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack, initialDat
                         <Button
                             variant="ghost"
                             className="text-muted-foreground"
+                            disabled={step === 1}
                             onClick={() => {
-                                if (step === 1) onBack()
-                                else setStep((step - 1) as any)
+                                if (step === 5) {
+                                    // From team setup, go back to workflow selection
+                                    onBack()
+                                } else if (step > 1) {
+                                    setStep((step - 1) as any)
+                                }
                             }}
                         >
                             Back
@@ -426,7 +533,7 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack, initialDat
                                 size="lg"
                                 className="ml-auto px-8"
                                 onClick={handleNext}
-                                disabled={(step === 1 && (!data.name.trim() || !data.role.trim())) || (step === 2 && !data.productDescription?.trim())}
+                                disabled={(step === 1 && !data.role.trim())}
                             >
                                 Next Step
                                 <ArrowRight className="w-4 h-4 ml-2" />
@@ -440,7 +547,6 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack, initialDat
             <div className="fixed bottom-10 left-0 right-0 flex justify-center gap-2">
                 <div className={`h-1.5 w-12 rounded-full transition-all ${step >= 1 ? "bg-accent" : "bg-muted"}`} />
                 <div className={`h-1.5 w-12 rounded-full transition-all ${step >= 2 ? "bg-accent" : "bg-muted"}`} />
-                <div className={`h-1.5 w-12 rounded-full transition-all ${step >= 3 ? "bg-accent" : "bg-muted"}`} />
                 <div className={`h-1.5 w-12 rounded-full transition-all ${step >= 4 ? "bg-accent" : "bg-muted"}`} />
                 {data.usageType === "team" && (
                     <div className={`h-1.5 w-12 rounded-full transition-all ${step >= 5 ? "bg-accent" : "bg-muted"}`} />

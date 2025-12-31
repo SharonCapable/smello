@@ -27,22 +27,24 @@ service cloud.firestore {
     // Check if user is a member of an organization
     function isOrgMember(orgId) {
       return isAuthenticated() && 
-             exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid));
+             (exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) || isSuperAdmin());
     }
     
     // Check if user is an organization admin
     function isOrgAdmin(orgId) {
       return isAuthenticated() && 
-             exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) &&
-             (get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role == 'super_admin' ||
-              get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role == 'org_admin');
+             (isSuperAdmin() || 
+              (exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) &&
+               (get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role == 'super_admin' ||
+                get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role == 'org_admin')));
     }
     
     // Check if user is a team admin
     function isTeamAdmin(orgId, teamId) {
       return isAuthenticated() && 
-             exists(/databases/$(database)/documents/organizations/$(orgId)/teams/$(teamId)/members/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/organizations/$(orgId)/teams/$(teamId)/members/$(request.auth.uid)).data.role == 'admin';
+             (isSuperAdmin() ||
+              (exists(/databases/$(database)/documents/organizations/$(orgId)/teams/$(teamId)/members/$(request.auth.uid)) &&
+               get(/databases/$(database)/documents/organizations/$(orgId)/teams/$(teamId)/members/$(request.auth.uid)).data.role == 'admin'));
     }
 
     // ============================================
@@ -51,27 +53,27 @@ service cloud.firestore {
     
     // Users collection - users can only read/write their own profile
     match /users/{userId} {
-      allow read: if isOwner(userId);
-      allow write: if isOwner(userId);
+      allow read: if isOwner(userId) || isSuperAdmin();
+      allow write: if isOwner(userId) || isSuperAdmin();
     }
 
     // Personal Projects collection - users can only access their own projects
     match /projects/{projectId} {
-      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isSuperAdmin());
+      allow create: if isAuthenticated() && (request.resource.data.userId == request.auth.uid || isSuperAdmin());
+      allow update, delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isSuperAdmin());
     }
 
     // Usage stats - users can only access their own usage data
     match /usageStats/{userId} {
-      allow read: if isOwner(userId);
-      allow write: if isOwner(userId);
+      allow read: if isOwner(userId) || isSuperAdmin();
+      allow write: if isOwner(userId) || isSuperAdmin();
     }
 
     // API keys - users can only access their own API keys
     match /apiKeys/{userId} {
-      allow read: if isOwner(userId);
-      allow write: if isOwner(userId);
+      allow read: if isOwner(userId) || isSuperAdmin();
+      allow write: if isOwner(userId) || isSuperAdmin();
     }
 
     // ============================================
@@ -79,18 +81,21 @@ service cloud.firestore {
     // ============================================
     
     // Organizations - ONLY super admins can create
+    // Members and Super Admins can read
     match /organizations/{orgId} {
-      // Only org members can read
+      // Members and Super Admins can read
       allow read: if isOrgMember(orgId);
       // ONLY super admins can create organizations
       allow create: if isSuperAdmin();
-      // Only org admins can update/delete
+      // Org admins and Super Admins can update/delete
       allow update, delete: if isOrgAdmin(orgId);
       
       // Organization Members
       match /members/{memberId} {
         allow read: if isOrgMember(orgId);
-        allow write: if isOrgAdmin(orgId);
+        // Allow self-signup OR allow Super Admin/Org Admin to add members
+        allow create: if isOwner(memberId) || isOrgAdmin(orgId);
+        allow update, delete: if isOrgAdmin(orgId);
       }
       
       // Team Projects (nested under organization)
@@ -120,7 +125,7 @@ service cloud.firestore {
       // Teams (nested under organization)
       match /teams/{teamId} {
         allow read: if isOrgMember(orgId);
-        // Only org admins can create teams
+        // Only org admins or super admins can create teams
         allow create: if isOrgAdmin(orgId);
         allow update: if isOrgAdmin(orgId) || isTeamAdmin(orgId, teamId);
         allow delete: if isOrgAdmin(orgId);
@@ -128,7 +133,9 @@ service cloud.firestore {
         // Team Members
         match /members/{memberId} {
           allow read: if isOrgMember(orgId);
-          allow write: if isOrgAdmin(orgId) || isTeamAdmin(orgId, teamId);
+          // Allow joining if you are already an org member or are an admin
+          allow create: if (isOwner(memberId) && isOrgMember(orgId)) || isOrgAdmin(orgId);
+          allow update, delete: if isOrgAdmin(orgId) || isTeamAdmin(orgId, teamId);
         }
         
         // Sprints (nested under team)

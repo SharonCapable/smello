@@ -1,21 +1,13 @@
 import { NextResponse } from 'next/server'
-import admin from 'firebase-admin'
+import admin, { initAdmin } from '@/lib/firebase-admin'
 import { auth } from '@clerk/nextjs/server'
-
-function initAdmin() {
-  if (admin.apps && admin.apps.length) return
-  const raw = process.env.FIREBASE_SERVICE_ACCOUNT
-  if (!raw) throw new Error('FIREBASE_SERVICE_ACCOUNT is not set')
-  const serviceAccount = typeof raw === 'string' ? JSON.parse(raw) : raw
-  admin.initializeApp({ credential: admin.credential.cert(serviceAccount as any) })
-}
 
 async function getSessionUid() {
   const { userId } = await auth()
   return userId || null
 }
 
-export async function GET(_req: Request, { params }: { params: { uid: string } }) {
+export async function GET(_req: Request, { params }: { params: Promise<{ uid: string }> }) {
   try {
     initAdmin()
 
@@ -23,9 +15,16 @@ export async function GET(_req: Request, { params }: { params: { uid: string } }
     const sessionUid = await getSessionUid()
     if (!sessionUid) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 })
 
-    const uid = params.uid
-    if (!uid) return NextResponse.json({ error: 'missing_uid' }, { status: 400 })
-    if (uid !== sessionUid) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+    const { uid } = await params;
+    if (!uid) {
+      console.error('Profile API error: UID is missing from params');
+      return NextResponse.json({ error: 'missing_uid' }, { status: 400 })
+    }
+
+    if (uid !== sessionUid) {
+      console.error(`Profile API error: Forbidden. Session UID: ${sessionUid}, Param UID: ${uid}`);
+      return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+    }
 
     const db = admin.firestore()
     const doc = await db.collection('users').doc(uid).get()
@@ -53,9 +52,10 @@ export async function GET(_req: Request, { params }: { params: { uid: string } }
   }
 }
 
-export async function POST(req: Request, { params }: { params: { uid: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ uid: string }> }) {
   try {
     initAdmin()
+    const { uid: _uid } = await params; // Await params for compatibility
 
     const sessionUid = await getSessionUid()
     if (!sessionUid) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 })

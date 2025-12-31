@@ -106,7 +106,7 @@ export function RiskAnalysis({ project, onBack }: RiskAnalysisProps) {
             const response = await fetch('/api/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ provider: 'anthropic', prompt, model: 'claude-3-5-sonnet-latest' }),
+                body: JSON.stringify({ provider: 'anthropic', prompt, model: 'claude-haiku-4-5' }),
             })
 
             if (!response.ok) {
@@ -115,6 +115,8 @@ export function RiskAnalysis({ project, onBack }: RiskAnalysisProps) {
 
             const data = await response.json()
             const content = data.candidates?.[0]?.content?.parts?.[0]?.text
+                || data.content?.[0]?.text
+                || data.text
 
             if (content) {
                 const cleanedText = content.replace(/```json\n?|\n?```/g, "").trim()

@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Calendar, Sparkles, Plus, Trash2, Milestone } from "lucide-react"
+import { Calendar, Sparkles, Plus, Trash2, Milestone, Loader2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 import { ApiKeyManager } from "@/lib/api-key-manager"
 import { ApiKeySetup } from "@/components/api-key-setup"
 import type { StoredProject } from "@/lib/storage"
@@ -26,6 +27,7 @@ interface RoadmapPhase {
 }
 
 export function RoadmapBuilder({ project, onBack }: RoadmapBuilderProps) {
+    const { toast } = useToast()
     const [phases, setPhases] = useState<RoadmapPhase[]>([
         { id: "1", name: "MVP", timeframe: "Month 1-2", features: [], goals: "Core value proposition" },
         { id: "2", name: "V1.0", timeframe: "Month 3-4", features: [], goals: "Market readiness" },
@@ -107,7 +109,7 @@ export function RoadmapBuilder({ project, onBack }: RoadmapBuilderProps) {
             const response = await fetch('/api/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ provider: 'anthropic', prompt, model: 'claude-3-5-sonnet-latest' }),
+                body: JSON.stringify({ provider: 'anthropic', prompt, model: 'claude-haiku-4-5' }),
             })
 
             if (!response.ok) {
@@ -134,7 +136,13 @@ export function RoadmapBuilder({ project, onBack }: RoadmapBuilderProps) {
 
         } catch (error) {
             console.error("Error generating roadmap:", error)
-            setError(error instanceof Error ? error.message : "Failed to generate content")
+            const msg = error instanceof Error ? error.message : "Failed to generate content"
+            setError(msg)
+            toast({
+                title: "Generation Failed",
+                description: msg,
+                variant: "destructive",
+            })
         } finally {
             setIsGenerating(false)
         }
@@ -187,8 +195,17 @@ export function RoadmapBuilder({ project, onBack }: RoadmapBuilderProps) {
                         </Button>
                     )}
                     <Button onClick={handleGenerate} disabled={isGenerating}>
-                        <Sparkles className="w-4 h-4 mr-2" />
-                        Auto-Generate Roadmap
+                        {isGenerating ? (
+                            <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Generating...
+                            </>
+                        ) : (
+                            <>
+                                <Sparkles className="w-4 h-4 mr-2" />
+                                Auto-Generate Roadmap
+                            </>
+                        )}
                     </Button>
                 </div>
             </div>

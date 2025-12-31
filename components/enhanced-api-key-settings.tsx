@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { AlertCircle, Key, Eye, EyeOff, CheckCircle, XCircle, Settings } from "lucide-react"
+import { AlertCircle, Key, Eye, EyeOff, CheckCircle, XCircle, Settings, Trash2, RefreshCw, Download } from "lucide-react"
+import { clearSmelloCache, clearOnboardingData, clearProjectData, fullReset, downloadDataBackup, getCacheStatus } from "@/lib/cache-utils"
 
 interface ApiKeyConfig {
   provider: string
@@ -119,6 +120,33 @@ export function EnhancedApiKeySettings() {
         : k
     )
     saveApiKeys(updatedKeys)
+
+    // If valid, save to Firestore for server-side generation
+    if (isValid) {
+      try {
+        const keyPayload: Record<string, string> = {}
+        // Map provider id to Firestore key names
+        if (provider === 'google') {
+          keyPayload.geminiKey = keyConfig.key
+        } else if (provider === 'anthropic') {
+          keyPayload.claudeKey = keyConfig.key
+        }
+
+        const response = await fetch('/api/keys', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(keyPayload)
+        })
+
+        if (response.ok) {
+          console.log('API key saved to server successfully')
+        } else {
+          console.error('Failed to save API key to server')
+        }
+      } catch (error) {
+        console.error('Error saving API key to server:', error)
+      }
+    }
   }
 
   const handleRemoveKey = (provider: string) => {
@@ -288,6 +316,119 @@ export function EnhancedApiKeySettings() {
               </p>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Troubleshooting Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <RefreshCw className="w-5 h-5" />
+            Troubleshooting
+          </CardTitle>
+          <CardDescription>
+            Clear cache and reset data if you're experiencing issues
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3">
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <div>
+                <p className="font-medium text-sm">Clear Cache</p>
+                <p className="text-xs text-muted-foreground">Clear all cached data (keeps auth)</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (confirm('Clear all Smello cache? This will not sign you out.')) {
+                    clearSmelloCache()
+                    alert('✅ Cache cleared! Reload the page to see changes.')
+                  }
+                }}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Clear
+              </Button>
+            </div>
+
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <div>
+                <p className="font-medium text-sm">Reset Onboarding</p>
+                <p className="text-xs text-muted-foreground">Clear onboarding data to start fresh</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (confirm('Reset onboarding? You\'ll need to complete setup again.')) {
+                    clearOnboardingData()
+                    alert('✅ Onboarding reset! Reload to start fresh.')
+                  }
+                }}
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Reset
+              </Button>
+            </div>
+
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <div>
+                <p className="font-medium text-sm">Clear Projects</p>
+                <p className="text-xs text-muted-foreground">Remove all local project data</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (confirm('⚠️ Delete all local projects? This cannot be undone!')) {
+                    clearProjectData()
+                    alert('✅ Projects cleared!')
+                  }
+                }}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Clear
+              </Button>
+            </div>
+
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <div>
+                <p className="font-medium text-sm">Download Backup</p>
+                <p className="text-xs text-muted-foreground">Export all data as JSON</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={downloadDataBackup}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download
+              </Button>
+            </div>
+
+            <div className="flex items-center justify-between p-3 border rounded-lg bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900">
+              <div>
+                <p className="font-medium text-sm text-red-700 dark:text-red-300">Full Reset</p>
+                <p className="text-xs text-red-600 dark:text-red-400">Clear everything and reload</p>
+              </div>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={fullReset}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Reset All
+              </Button>
+            </div>
+          </div>
+
+          <div className="p-3 bg-muted/50 rounded-lg">
+            <p className="text-xs text-muted-foreground">
+              💡 <strong>Tip:</strong> If you're experiencing routing issues or stuck screens, try "Clear Cache" first.
+              This fixes most navigation problems without losing your data.
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>

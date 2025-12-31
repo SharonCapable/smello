@@ -95,10 +95,10 @@ function SidebarContent({
   // State for collapsible groups - default open for better discovery
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     "General": true,
-    "Ideation": true,
-    "Strategy": true,
-    "Build & Launch": true,
-    "System": true
+    "Ideation": false,
+    "Strategy": false,
+    "Build & Launch": false,
+    "System": false
   })
 
   useState(() => {
@@ -114,10 +114,6 @@ function SidebarContent({
     if (isMobile && closeMobileSheet) {
       closeMobileSheet()
     }
-  }
-
-  const handleDesktopVersion = () => {
-    window.open('/desktop', '_blank')
   }
 
   const navigationItems = [
@@ -279,39 +275,13 @@ function SidebarContent({
 
       {/* Footer Actions */}
       <div className="border-t border-border/50 p-2 space-y-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleDesktopVersion}
-          className={`w-full justify-start ${isCollapsed && !isMobile ? 'px-2 justify-center' : 'px-4'}`}
-          title={isCollapsed ? "Desktop Version" : undefined}
-        >
-          <Monitor className="w-4 h-4 flex-shrink-0" />
-          {(!isCollapsed || isMobile) && <span className="ml-2">Desktop</span>}
-        </Button>
-
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          className={`w-full justify-start ${isCollapsed && !isMobile ? 'px-2 justify-center' : 'px-4'}`}
-          title={isCollapsed ? "Toggle theme" : undefined}
-        >
-          {/* Theme Icon Logic */}
-          {mounted ? (
-            theme === "dark" ? <Sun className="w-4 h-4 flex-shrink-0" /> : <Moon className="w-4 h-4 flex-shrink-0" />
-          ) : (
-            <Sun className="w-4 h-4 flex-shrink-0" />
-          )}
-          {(!isCollapsed || isMobile) && <span className="ml-2">Theme</span>}
-        </Button>
 
         <div className="pt-2">
           <Button
             variant="outline"
             size="sm"
-            onClick={() => handleNavigation("team-dashboard")}
-            className={`w-full justify-start bg-blue-600/5 text-blue-500 hover:bg-blue-600/10 border-blue-500/20 ${isCollapsed && !isMobile ? 'px-2 justify-center' : 'px-4'}`}
+            onClick={() => onNavigate("team-dashboard")}
+            className={`w-full justify-start bg-accent/5 text-accent hover:bg-accent/10 border-accent/20 ${isCollapsed && !isMobile ? 'px-2 justify-center' : 'px-4'}`}
             title={isCollapsed ? "Switch to Team Dashboard" : undefined}
           >
             <Users className="w-4 h-4 flex-shrink-0" />

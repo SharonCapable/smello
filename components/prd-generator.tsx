@@ -9,7 +9,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { FileText, Sparkles, RefreshCw, AlertCircle, Save, Download, Plus, Trash2, Edit3, Eye } from "lucide-react"
+import { FileText, Sparkles, RefreshCw, AlertCircle, Save, Download, Plus, Trash2, Edit3, Eye, Loader2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 import { ApiKeyManager } from "@/lib/api-key-manager"
 import { ApiKeySetup } from "@/components/api-key-setup"
 import { MarkdownRenderer } from "@/components/markdown-renderer"
@@ -54,6 +55,7 @@ const SECTION_TYPES: { type: PRDSectionType; label: string; description: string 
 ]
 
 export function PRDGenerator({ project, onBack, onProjectUpdate }: PRDGeneratorProps) {
+    const { toast } = useToast()
     const [sections, setSections] = useState<PRDSection[]>([])
     const [isGenerating, setIsGenerating] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
@@ -152,7 +154,7 @@ export function PRDGenerator({ project, onBack, onProjectUpdate }: PRDGeneratorP
             const response = await fetch('/api/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ provider: 'anthropic', prompt, model: 'claude-3-5-sonnet-latest' }),
+                body: JSON.stringify({ provider: 'anthropic', prompt, model: 'claude-haiku-4-5' }),
             })
 
             if (!response.ok) {
@@ -161,6 +163,8 @@ export function PRDGenerator({ project, onBack, onProjectUpdate }: PRDGeneratorP
 
             const data = await response.json()
             const content = data.candidates?.[0]?.content?.parts?.[0]?.text
+                || data.content?.[0]?.text
+                || data.text
 
             if (content) {
                 // Update content and switch to preview mode automatically
@@ -171,7 +175,13 @@ export function PRDGenerator({ project, onBack, onProjectUpdate }: PRDGeneratorP
 
         } catch (error) {
             console.error("Error generating section:", error)
-            setError(error instanceof Error ? error.message : "Failed to generate content")
+            const msg = error instanceof Error ? error.message : "Failed to generate content"
+            setError(msg)
+            toast({
+                title: "Generation Failed",
+                description: msg,
+                variant: "destructive",
+            })
         } finally {
             setIsGenerating(false)
         }
@@ -355,8 +365,12 @@ export function PRDGenerator({ project, onBack, onProjectUpdate }: PRDGeneratorP
                                             onClick={() => generateSectionContent(section.id, section.type)}
                                             disabled={isGenerating}
                                         >
-                                            <Sparkles className="w-4 h-4 mr-2 text-accent" />
-                                            {section.content ? "Regenerate" : "Generate"}
+                                            {isGenerating ? (
+                                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                            ) : (
+                                                <Sparkles className="w-4 h-4 mr-2 text-accent" />
+                                            )}
+                                            {isGenerating ? "Generating..." : section.content ? "Regenerate" : "Generate"}
                                         </Button>
                                         <Button
                                             variant="ghost"

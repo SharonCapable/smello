@@ -9,15 +9,18 @@ import { TeamsLayout } from "./teams/teams-layout"
 import { TeamAnalytics } from "./teams/analytics"
 import { CalendarView } from "./teams/calendar-view"
 import { MessageCenter } from "./teams/message-center"
+import { OrganizationView } from "./teams/organization-view"
+import { TeamOverview } from "./teams/team-overview"
 import { Task } from "./teams/task-table"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Lock, Users, Plus } from "lucide-react"
+import { ArrowLeft } from "lucide-react"
 
 interface TeamDashboardProps {
     onBack: () => void
     organizationId?: string
     teamId?: string
     organizationName?: string
+    teamName?: string
 }
 
 const INITIAL_TEAM_TASKS: Task[] = [
@@ -27,12 +30,10 @@ const INITIAL_TEAM_TASKS: Task[] = [
     { id: "t4", values: { title: "Design System Refresh", status: "Review", priority: "High", progress: 85, tags: ["Design"], assignee: "Taylor" } },
 ]
 
-export function TeamDashboard({ onBack, organizationId, teamId, organizationName }: TeamDashboardProps) {
+export function TeamDashboard({ onBack, organizationId, teamId, organizationName = "Wizzle Org", teamName = "Engineering" }: TeamDashboardProps) {
     const [activeTab, setActiveTab] = useState("personal-dashboard")
     const [teamTasks, setTeamTasks] = useState<Task[]>(INITIAL_TEAM_TASKS)
-
-    // In a real scenario, we'd fetch tasks based on organizationId and teamId here
-    // For now, we'll continue with INITIAL_TEAM_TASKS but acknowledge the context
+    const [currentTeam, setCurrentTeam] = useState({ id: teamId, name: teamName })
 
     const handlePromoteTask = (task: Task) => {
         setTeamTasks(prev => [task, ...prev])
@@ -44,10 +45,59 @@ export function TeamDashboard({ onBack, organizationId, teamId, organizationName
         ))
     }
 
+    // Navigation handlers for breadcrumbs
+    const handleNavigateFromDashboard = (section: string) => {
+        if (section === 'organization') {
+            setActiveTab('organization')
+        } else if (section === 'team') {
+            setActiveTab('team-overview')
+        }
+    }
+
+    // Navigate to team from organization view
+    const handleNavigateToTeam = (teamId: string, teamName: string) => {
+        setCurrentTeam({ id: teamId, name: teamName })
+        setActiveTab('team-overview')
+    }
+
+    // Navigate to specific section from team overview
+    const handleNavigateToSection = (section: string) => {
+        const sectionMap: Record<string, string> = {
+            'my-dashboard': 'personal-dashboard',
+            'sprint-board': 'sprints',
+            'collaboration': 'collaboration',
+            'analytics': 'analytics'
+        }
+        setActiveTab(sectionMap[section] || section)
+    }
+
     const renderContent = () => {
         switch (activeTab) {
+            case "organization":
+                return (
+                    <OrganizationView
+                        organizationName={organizationName}
+                        onNavigateToTeam={handleNavigateToTeam}
+                    />
+                )
+            case "team-overview":
+                return (
+                    <TeamOverview
+                        teamName={currentTeam.name || teamName}
+                        organizationName={organizationName}
+                        onNavigateToOrganization={() => setActiveTab('organization')}
+                        onNavigateToSection={handleNavigateToSection}
+                    />
+                )
             case "personal-dashboard":
-                return <MyDashboard onPromoteTask={handlePromoteTask} />
+                return (
+                    <MyDashboard
+                        onPromoteTask={handlePromoteTask}
+                        onNavigate={handleNavigateFromDashboard}
+                        organizationName={organizationName}
+                        teamName={currentTeam.name || teamName}
+                    />
+                )
             case "projects":
                 return <ProjectsView organizationId={organizationId} teamId={teamId} />
             case "collaboration":
@@ -79,7 +129,7 @@ export function TeamDashboard({ onBack, organizationId, teamId, organizationName
             <TeamsLayout
                 activeTab={activeTab}
                 onTabChange={setActiveTab}
-                organizationName={organizationName || "Wizzle Org"}
+                organizationName={organizationName}
             >
                 {renderContent()}
             </TeamsLayout>

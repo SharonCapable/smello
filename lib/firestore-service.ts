@@ -195,11 +195,32 @@ export const createProject = async (
   projectData: Partial<ProjectArtifact>
 ): Promise<string> => {
   if (!db) throw new Error('Firestore not initialized');
+
+  // Check for duplicate name
+  if (projectData.name) {
+    const projectsRef = collection(db, 'projects');
+    const q = query(
+      projectsRef,
+      where('userId', '==', userId),
+      where('name', '==', projectData.name),
+      where('archived', '==', false)
+    );
+    const snapshot = await getDocs(q);
+    if (!snapshot.empty) {
+      throw new Error(`A project named "${projectData.name}" already exists.`);
+    }
+  }
+
   const projectId = `proj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   const projectRef = doc(db, 'projects', projectId);
 
+  // Filter out undefined values - Firestore doesn't accept them
+  const cleanedData = Object.fromEntries(
+    Object.entries(projectData).filter(([_, value]) => value !== undefined)
+  );
+
   await setDoc(projectRef, {
-    ...projectData,
+    ...cleanedData,
     id: projectId,
     userId,
     archived: false,
@@ -216,8 +237,14 @@ export const updateProject = async (
 ): Promise<void> => {
   if (!db) throw new Error('Firestore not initialized');
   const projectRef = doc(db, 'projects', projectId);
+
+  // Filter out undefined values - Firestore doesn't accept them
+  const cleanedUpdates = Object.fromEntries(
+    Object.entries(updates).filter(([_, value]) => value !== undefined)
+  );
+
   await updateDoc(projectRef, {
-    ...updates,
+    ...cleanedUpdates,
     updatedAt: serverTimestamp(),
   });
 };
@@ -457,6 +484,8 @@ export const isSuperAdmin = async (userId: string): Promise<boolean> => {
 export const createOrganization = async (
   userId: string,
   name: string,
+  userEmail?: string,
+  userName?: string,
   domain?: string,
   settings?: {
     allowSelfSignup?: boolean;
@@ -466,7 +495,7 @@ export const createOrganization = async (
 ): Promise<string> => {
   if (!db) throw new Error('Firestore not initialized');
 
-  // Check if user is super admin
+  // ONLY super admins can create organizations
   const isAdmin = await isSuperAdmin(userId);
   if (!isAdmin) {
     throw new Error('Only super admins can create organizations');
@@ -478,14 +507,14 @@ export const createOrganization = async (
   await setDoc(orgRef, {
     id: orgId,
     name,
-    domain,
+    domain: domain || null,
     createdBy: userId,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     settings: {
-      allowSelfSignup: settings?.allowSelfSignup || false,
-      requireApproval: settings?.requireApproval || true,
-      maxMembers: settings?.maxMembers,
+      allowSelfSignup: settings?.allowSelfSignup ?? true,
+      requireApproval: settings?.requireApproval ?? false,
+      maxMembers: settings?.maxMembers || null,
     },
     superAdmins: [userId],
   });
@@ -493,13 +522,54 @@ export const createOrganization = async (
   // Add creator as first member
   await addOrganizationMember(orgId, {
     userId,
-    email: '', // Should be fetched from user profile
-    name: '', // Should be fetched from user profile
+    email: userEmail || '',
+    name: userName || '',
     role: 'super_admin',
     invitedBy: userId,
   });
 
   return orgId;
+};
+
+// Search for organization by name (case-insensitive)
+export const findOrganizationByName = async (name: string): Promise<OrganizationDoc | null> => {
+  if (!db) return null;
+  const orgsRef = collection(db, 'organizations');
+  const q = query(orgsRef, where('name', '==', name));
+  const querySnapshot = await getDocs(q);
+
+  if (!querySnapshot.empty) {
+    return querySnapshot.docs[0].data() as OrganizationDoc;
+  }
+  return null;
+};
+
+// Join an organization and a team within it
+export const joinOrganizationWithTeam = async (
+  orgId: string,
+  teamId: string,
+  userId: string,
+  userEmail: string,
+  userName: string
+): Promise<void> => {
+  if (!db) throw new Error('Firestore not initialized');
+
+  // Add to organization members
+  await addOrganizationMember(orgId, {
+    userId,
+    email: userEmail,
+    name: userName,
+    role: 'member',
+    invitedBy: 'self-signup'
+  });
+
+  // Add to team members
+  await addTeamMember(orgId, teamId, {
+    userId,
+    email: userEmail,
+    name: userName,
+    role: 'member'
+  });
 };
 
 // Add member to organization
@@ -712,6 +782,13 @@ export const addTeamMember = async (
     ...memberData,
     joinedAt: serverTimestamp(),
   });
+};
+
+// Get all teams in an organization
+export const getOrganizationTeams = async (orgId: string): Promise<TeamDoc[]> => {
+  if (!db) return [];
+  const teamsSnapshot = await getDocs(collection(db, 'organizations', orgId, 'teams'));
+  return teamsSnapshot.docs.map(doc => doc.data() as TeamDoc);
 };
 
 // Get user's teams in an organization

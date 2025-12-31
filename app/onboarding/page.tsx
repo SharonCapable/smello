@@ -119,10 +119,10 @@ function OnboardingContent() {
 
                 // Redirect to home or show success message
                 if (isEditMode) {
-                    // Could show a toast here, but for now just redirect back
-                    router.push("/settings")
+                    // Use replace to prevent back-button loop
+                    router.replace("/settings")
                 } else {
-                    router.push("/")
+                    router.replace("/")
                 }
             }
         } catch (error: any) {
@@ -137,7 +137,7 @@ function OnboardingContent() {
 
     const handleBack = () => {
         if (isEditMode) {
-            router.back()
+            router.push("/settings")
         } else {
             router.push("/")
         }

@@ -11,25 +11,40 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { LogIn, LogOut, User, Settings, Sparkles, Zap, Brain, Briefcase } from "lucide-react"
+import { LogIn, LogOut, User, Settings, Sparkles, Zap, Brain, Briefcase, Sun, Moon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { useUser, useClerk } from "@clerk/nextjs"
+import { useTheme } from "next-themes"
 import { GlobalUsageCounter } from "@/lib/global-usage-counter"
 import { setUserId } from "@/lib/storage-hybrid"
 import { UsageCounterBadge } from "@/components/usage-counter-badge"
+import { ModeSwitcher } from "@/components/mode-switcher"
 
 export function AppHeader() {
     const { user, isLoaded, isSignedIn } = useUser()
     const { signOut, openSignIn } = useClerk()
+    const { theme, setTheme } = useTheme()
     const [mounted, setMounted] = useState(false)
     const [remainingOperations, setRemainingOperations] = useState(0)
     const [activeProvider, setActiveProvider] = useState<string | null>(null)
     const [userRole, setUserRole] = useState<string>("")
     const [userName, setUserName] = useState<string>("")
+    const [currentMode, setCurrentMode] = useState<'pm' | 'teams'>('pm')
 
     useEffect(() => {
         setMounted(true)
         updateStatus()
+
+        // Load current mode from localStorage
+        const onboardingData = localStorage.getItem("smello-user-onboarding")
+        if (onboardingData) {
+            try {
+                const data = JSON.parse(onboardingData)
+                setCurrentMode(data.usageType === "team" ? "teams" : "pm")
+            } catch (e) {
+                console.error("Failed to parse onboarding data", e)
+            }
+        }
 
         // Load user profile from Firestore
         // Load user profile from Firestore via Server API
@@ -113,6 +128,29 @@ export function AppHeader() {
         }
     }
 
+    const handleModeChange = (mode: 'pm' | 'teams') => {
+        setCurrentMode(mode)
+
+        // Update localStorage
+        const onboardingData = localStorage.getItem("smello-user-onboarding")
+        if (onboardingData) {
+            try {
+                const data = JSON.parse(onboardingData)
+                data.usageType = mode === 'teams' ? 'team' : 'personal'
+                localStorage.setItem("smello-user-onboarding", JSON.stringify(data))
+            } catch (e) {
+                console.error("Failed to update mode", e)
+            }
+        }
+
+        // Redirect to appropriate dashboard
+        if (mode === 'teams') {
+            window.location.href = '/teams'
+        } else {
+            window.location.href = '/'
+        }
+    }
+
     // Display session user name by default, but override with onboarding name if available
     const displayUserName = userName || user?.fullName || "Guest"
     const displayUserEmail = user?.primaryEmailAddress?.emailAddress || ""
@@ -168,8 +206,43 @@ export function AppHeader() {
                     <UsageCounterBadge />
                 </div>
 
+                {/* Center - Mode Switcher */}
+                <div className="flex items-center">
+                    <ModeSwitcher
+                        currentMode={currentMode}
+                        onModeChange={handleModeChange}
+                    />
+                </div>
+
                 {/* Right side - User Profile */}
                 <div className="flex items-center gap-3">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-9 w-9">
+                                {theme === 'dark' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+                                <span className="sr-only">Toggle theme</span>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => setTheme("light")}>
+                                <Sun className="mr-2 h-4 w-4" />
+                                Light
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setTheme("dark")}>
+                                <Moon className="mr-2 h-4 w-4" />
+                                Dark
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setTheme("brown")}>
+                                <Briefcase className="mr-2 h-4 w-4" />
+                                Earth
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setTheme("cool")}>
+                                <Sparkles className="mr-2 h-4 w-4" />
+                                Midnight
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="gap-3 h-auto py-2 px-3 hover:bg-muted/50">

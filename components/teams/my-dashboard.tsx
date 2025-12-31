@@ -1,7 +1,7 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
-import { TaskTable, Column, Task, ColumnType } from "./task-table"
+import React, { useState, useMemo } from "react"
+import { TaskTable, Column, Task, ColumnType, Subtask } from "./task-table"
 import { Button } from "@/components/ui/button"
 import {
     Plus,
@@ -12,16 +12,28 @@ import {
     Calendar as CalendarIcon,
     ChevronRight,
     Sparkles,
-    Home
+    Home,
+    Layers,
+    ChevronDown
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+    DropdownMenuSeparator,
+    DropdownMenuLabel
+} from "@/components/ui/dropdown-menu"
+import { Card } from "@/components/ui/card"
 
-const BREADCRUMBS = [
-    { label: "Wizzle Org", icon: Home },
-    { label: "Engineering", icon: List },
-    { label: "My Dashboard", active: true }
-]
+interface BreadcrumbItem {
+    label: string
+    icon?: React.ElementType
+    active?: boolean
+    onClick?: () => void
+}
 
 const DEFAULT_COLUMNS: Column[] = [
     { id: "title", label: "Task Name", type: "text", width: 300 },
@@ -40,15 +52,71 @@ const INITIAL_TASKS: Task[] = [
     { id: "4", values: { title: "Integrate Google Calendar", status: "Backlog", priority: "Medium", progress: 0, tags: ["Integration"] } },
 ]
 
+type GroupByOption = 'none' | 'status' | 'priority' | 'tags'
+
 interface MyDashboardProps {
     onPromoteTask?: (task: Task) => void
+    onNavigate?: (section: string) => void
+    organizationName?: string
+    teamName?: string
 }
 
-export function MyDashboard({ onPromoteTask }: MyDashboardProps) {
+export function MyDashboard({
+    onPromoteTask,
+    onNavigate,
+    organizationName = "Wizzle Org",
+    teamName = "Engineering"
+}: MyDashboardProps) {
     const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS)
     const [columns, setColumns] = useState<Column[]>(DEFAULT_COLUMNS)
     const [searchQuery, setSearchQuery] = useState("")
     const [lastSynced, setLastSynced] = useState(new Date())
+    const [groupBy, setGroupBy] = useState<GroupByOption>('none')
+    const [viewMode, setViewMode] = useState<'table' | 'board' | 'calendar'>('table')
+
+    const breadcrumbs: BreadcrumbItem[] = [
+        { label: organizationName, icon: Home, onClick: () => onNavigate?.('organization') },
+        { label: teamName, icon: List, onClick: () => onNavigate?.('team') },
+        { label: "My Dashboard", active: true }
+    ]
+
+    // Group tasks based on selected grouping
+    const groupedTasks = useMemo(() => {
+        const filteredTasks = tasks.filter(t =>
+            (t.values.title || "").toLowerCase().includes(searchQuery.toLowerCase())
+        )
+
+        if (groupBy === 'none') {
+            return { 'All Tasks': filteredTasks }
+        }
+
+        const groups: Record<string, Task[]> = {}
+
+        filteredTasks.forEach(task => {
+            if (groupBy === 'status') {
+                const status = task.values.status || 'To Do'
+                if (!groups[status]) groups[status] = []
+                groups[status].push(task)
+            } else if (groupBy === 'priority') {
+                const priority = task.values.priority || 'Medium'
+                if (!groups[priority]) groups[priority] = []
+                groups[priority].push(task)
+            } else if (groupBy === 'tags') {
+                const tags = task.values.tags || []
+                if (tags.length === 0) {
+                    if (!groups['Untagged']) groups['Untagged'] = []
+                    groups['Untagged'].push(task)
+                } else {
+                    tags.forEach((tag: string) => {
+                        if (!groups[tag]) groups[tag] = []
+                        groups[tag].push(task)
+                    })
+                }
+            }
+        })
+
+        return groups
+    }, [tasks, groupBy, searchQuery])
 
     const handleUpdateTask = (taskId: string, fieldId: string, value: any) => {
         setTasks(prev => prev.map(t =>
@@ -91,21 +159,58 @@ export function MyDashboard({ onPromoteTask }: MyDashboardProps) {
         const task = tasks.find(t => t.id === taskId)
         if (task && onPromoteTask) {
             onPromoteTask(task)
-            handleDeleteTask(taskId) // Remove from personal dashboard after promoting
+            handleDeleteTask(taskId)
         }
+    }
+
+    const handleUpdateSubtasks = (taskId: string, subtasks: Subtask[]) => {
+        setTasks(prev => prev.map(t =>
+            t.id === taskId ? { ...t, subtasks } : t
+        ))
+        setLastSynced(new Date())
+    }
+
+    const getGroupColor = (groupName: string) => {
+        const colors: Record<string, string> = {
+            'Done': 'bg-green-500/10 text-green-500 border-green-500/20',
+            'In Progress': 'bg-blue-500/10 text-blue-500 border-blue-500/20',
+            'Blocked': 'bg-red-500/10 text-red-500 border-red-500/20',
+            'Review': 'bg-purple-500/10 text-purple-500 border-purple-500/20',
+            'To Do': 'bg-orange-500/10 text-orange-500 border-orange-500/20',
+            'Backlog': 'bg-gray-500/10 text-gray-500 border-gray-500/20',
+            'Critical': 'bg-red-500/10 text-red-500 border-red-500/20',
+            'High': 'bg-orange-500/10 text-orange-500 border-orange-500/20',
+            'Medium': 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
+            'Low': 'bg-green-500/10 text-green-500 border-green-500/20',
+        }
+        return colors[groupName] || 'bg-accent/10 text-accent border-accent/20'
+    }
+
+    const groupByLabels: Record<GroupByOption, string> = {
+        'none': 'No Grouping',
+        'status': 'Group by Status',
+        'priority': 'Group by Priority',
+        'tags': 'Group by Tags'
     }
 
     return (
         <div className="flex flex-col h-full space-y-6 animate-fade-in max-w-7xl mx-auto">
-            {/* Breadcrumbs */}
-            <nav className="flex items-center gap-2 text-xs text-muted-foreground/60 mb-[-12px]">
-                {BREADCRUMBS.map((crumb, i) => (
+            {/* Breadcrumbs - Now Clickable */}
+            <nav className="flex items-center gap-2 text-xs text-muted-foreground/60 pb-2">
+                {breadcrumbs.map((crumb, i) => (
                     <React.Fragment key={crumb.label}>
-                        <div className={`flex items-center gap-1.5 hover:text-foreground transition-colors cursor-pointer ${crumb.active ? "text-foreground font-medium" : ""}`}>
+                        <button
+                            onClick={crumb.onClick}
+                            disabled={crumb.active}
+                            className={`flex items-center gap-1.5 transition-colors ${crumb.active
+                                ? "text-foreground font-medium cursor-default"
+                                : "hover:text-foreground cursor-pointer"
+                                }`}
+                        >
                             {crumb.icon && <crumb.icon className="w-3 h-3" />}
                             {crumb.label}
-                        </div>
-                        {i < BREADCRUMBS.length - 1 && <ChevronRight className="w-3 h-3 opacity-30" />}
+                        </button>
+                        {i < breadcrumbs.length - 1 && <ChevronRight className="w-3 h-3 opacity-30" />}
                     </React.Fragment>
                 ))}
             </nav>
@@ -170,20 +275,62 @@ export function MyDashboard({ onPromoteTask }: MyDashboardProps) {
                     </div>
                 </div>
                 <div className="flex items-center gap-1 border rounded-lg p-1 bg-muted/20 h-10">
-                    <Button variant="ghost" size="sm" className="h-8 px-3 text-xs gap-1.5 bg-background shadow-sm rounded-md font-semibold">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setViewMode('table')}
+                        className={`h-8 px-3 text-xs gap-1.5 font-semibold ${viewMode === 'table' ? 'bg-background shadow-sm rounded-md' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
                         <List className="w-3.5 h-3.5" />
                         Table
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-8 px-3 text-xs gap-1.5 text-muted-foreground hover:text-foreground font-medium">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setViewMode('board')}
+                        className={`h-8 px-3 text-xs gap-1.5 font-medium ${viewMode === 'board' ? 'bg-background shadow-sm rounded-md' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
                         <LayoutGrid className="w-3.5 h-3.5" />
                         Board
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-8 px-3 text-xs gap-1.5 text-muted-foreground hover:text-foreground font-medium">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setViewMode('calendar')}
+                        className={`h-8 px-3 text-xs gap-1.5 font-medium ${viewMode === 'calendar' ? 'bg-background shadow-sm rounded-md' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
                         <CalendarIcon className="w-3.5 h-3.5" />
                         Calendar
                     </Button>
                 </div>
                 <div className="flex items-center gap-2">
+                    {/* Group By Dropdown */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-10 px-4 gap-2 text-muted-foreground hover:text-foreground font-medium">
+                                <Layers className="w-4 h-4" />
+                                {groupByLabels[groupBy]}
+                                <ChevronDown className="w-3 h-3" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuLabel className="text-xs uppercase tracking-wider text-muted-foreground">Group Tasks By</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => setGroupBy('none')} className={groupBy === 'none' ? 'bg-accent/10' : ''}>
+                                <span>No Grouping</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setGroupBy('status')} className={groupBy === 'status' ? 'bg-accent/10' : ''}>
+                                <span>Status</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setGroupBy('priority')} className={groupBy === 'priority' ? 'bg-accent/10' : ''}>
+                                <span>Priority</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setGroupBy('tags')} className={groupBy === 'tags' ? 'bg-accent/10' : ''}>
+                                <span>Tags</span>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+
                     <Button variant="ghost" size="sm" className="h-10 px-4 gap-2 text-muted-foreground hover:text-foreground font-medium">
                         <Filter className="w-4 h-4" />
                         Filter
@@ -191,18 +338,34 @@ export function MyDashboard({ onPromoteTask }: MyDashboardProps) {
                 </div>
             </div>
 
-            {/* Table Section */}
-            <div className="flex-grow min-h-[400px]">
-                <TaskTable
-                    tasks={tasks.filter(t => (t.values.title || "").toLowerCase().includes(searchQuery.toLowerCase()))}
-                    columns={columns}
-                    onUpdateTask={handleUpdateTask}
-                    onAddTask={handleAddTask}
-                    onDeleteTask={handleDeleteTask}
-                    onPromoteTask={handleInternalPromoteTask}
-                    onResizeColumn={handleResizeColumn}
-                    onAddColumn={handleAddColumn}
-                />
+            {/* Table Section with Grouping */}
+            <div className="flex-grow min-h-[400px] space-y-6">
+                {Object.entries(groupedTasks).map(([groupName, groupTasks]) => (
+                    <div key={groupName} className="space-y-3">
+                        {groupBy !== 'none' && (
+                            <div className="flex items-center gap-3">
+                                <Badge
+                                    variant="outline"
+                                    className={`text-xs font-bold ${getGroupColor(groupName)}`}
+                                >
+                                    {groupName}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">{groupTasks.length} tasks</span>
+                            </div>
+                        )}
+                        <TaskTable
+                            tasks={groupTasks}
+                            columns={columns}
+                            onUpdateTask={handleUpdateTask}
+                            onAddTask={handleAddTask}
+                            onDeleteTask={handleDeleteTask}
+                            onPromoteTask={handleInternalPromoteTask}
+                            onResizeColumn={handleResizeColumn}
+                            onAddColumn={handleAddColumn}
+                            onUpdateSubtasks={handleUpdateSubtasks}
+                        />
+                    </div>
+                ))}
             </div>
 
             {/* Active Sprint Shortcut */}

@@ -20,21 +20,27 @@ let db: Firestore | undefined;
 let storage: FirebaseStorage | undefined;
 
 const isFirebaseConfigured = Boolean(
-  firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.appId
+  firebaseConfig.apiKey &&
+  firebaseConfig.authDomain &&
+  firebaseConfig.appId &&
+  firebaseConfig.projectId
 );
 
 if (typeof window !== 'undefined') {
   // Client-side initialization — make tolerant for missing envs
   try {
     if (!isFirebaseConfigured) {
-      // Do not attempt to initialize Firebase without required public config
-      // This prevents runtime exceptions in production when env vars are missing.
-      // Consumers should check exported values before using them.
-      // eslint-disable-next-line no-console
-      console.warn('Firebase not initialized: missing NEXT_PUBLIC_FIREBASE_* configuration');
+      console.warn('Firebase not initialized: missing NEXT_PUBLIC_FIREBASE_* configuration. Required: apiKey, authDomain, appId, projectId');
+      console.log('Current config:', {
+        apiKey: !!firebaseConfig.apiKey,
+        authDomain: !!firebaseConfig.authDomain,
+        appId: !!firebaseConfig.appId,
+        projectId: !!firebaseConfig.projectId
+      });
     } else {
       if (!getApps().length) {
         app = initializeApp(firebaseConfig as any);
+        console.log('Firebase initialized successfully with project:', firebaseConfig.projectId);
       } else {
         app = getApps()[0];
       }
@@ -46,7 +52,6 @@ if (typeof window !== 'undefined') {
       }
     }
   } catch (e) {
-    // eslint-disable-next-line no-console
     console.error('Firebase initialization error:', e);
   }
 }
