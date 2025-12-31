@@ -283,6 +283,7 @@ function SidebarContent({
             onClick={() => onNavigate("team-dashboard")}
             className={`w-full justify-start bg-accent/5 text-accent hover:bg-accent/10 border-accent/20 ${isCollapsed && !isMobile ? 'px-2 justify-center' : 'px-4'}`}
             title={isCollapsed ? "Switch to Team Dashboard" : undefined}
+            type="button"
           >
             <Users className="w-4 h-4 flex-shrink-0" />
             {(!isCollapsed || isMobile) && <span className="ml-2 font-bold uppercase tracking-widest text-[10px]">Team Dashboard</span>}
