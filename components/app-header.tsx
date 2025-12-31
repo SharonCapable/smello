@@ -317,7 +317,7 @@ export function AppHeader() {
                             </div>
 
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => (window.location.href = '/onboarding?mode=edit')}>
+                            <DropdownMenuItem onClick={() => (window.location.href = '/settings/profile')}>
                                 <User className="w-4 h-4 mr-2" />
                                 Profile Details
                             </DropdownMenuItem>

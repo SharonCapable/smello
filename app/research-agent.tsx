@@ -296,6 +296,25 @@ ${query.result || 'No findings available.'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Redeployment Notice */}
+          <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 p-4">
+            <div className="flex items-start gap-3">
+              <Info className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
+              <div className="space-y-1">
+                <h4 className="font-semibold text-blue-700 dark:text-blue-400">
+                  🚀 Service Migration in Progress
+                </h4>
+                <p className="text-sm text-blue-600 dark:text-blue-300">
+                  The Research Agent is currently being redeployed to Google Cloud Run for improved performance and reliability.
+                  This feature will be available again soon with enhanced capabilities.
+                </p>
+                <p className="text-xs text-blue-500 dark:text-blue-400 mt-2">
+                  Expected availability: Phase 3 (Q2 2026) • Thank you for your patience!
+                </p>
+              </div>
+            </div>
+          </div>
+
           <Collapsible>
             <CollapsibleTrigger asChild>
               <Button variant="ghost" className="w-full justify-between p-0 h-auto">
