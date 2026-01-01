@@ -119,6 +119,38 @@ export function ProjectManager({ onCreateNew, onLoadProject, onModeSelect }: Pro
     }
   }
 
+  const handleCreateJiraProject = async (data: { name: string; description: string; sector: string; targetAudience: string; keyFeatures: string[] }) => {
+    try {
+      const newProject: ProjectData = {
+        product: {
+          name: data.name,
+          description: data.description,
+          sector: data.sector,
+          target_audience: data.targetAudience
+        },
+        epics: [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+
+      const saved = await saveProject(newProject)
+      setShowNewProjectModal(false)
+      onLoadProject(saved)
+
+      toast({
+        title: "Project Imported",
+        description: `Project "${saved.name}" created from JIRA analysis.`
+      })
+    } catch (error) {
+      console.error("Failed to create project from JIRA:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create project from JIRA.",
+        variant: "destructive"
+      })
+    }
+  }
+
   return (
     <div className="max-w-6xl mx-auto">
       <div className="mb-8">
@@ -274,6 +306,7 @@ export function ProjectManager({ onCreateNew, onLoadProject, onModeSelect }: Pro
             description: "Document upload and parsing will be available in Phase 3.",
           })
         }}
+        onCreateFromJira={handleCreateJiraProject}
       />
     </div>
   )

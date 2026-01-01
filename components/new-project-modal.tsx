@@ -8,10 +8,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Lightbulb, FileText, Upload, ArrowRight, Sparkles, Loader2, CheckCircle2 } from "lucide-react"
+import { Lightbulb, FileText, Upload, ArrowRight, Sparkles, Loader2, CheckCircle2, Server } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { JiraImport } from "@/components/jira-import"
 
-type ProjectCreationMode = "idea" | "describe" | "upload" | null
+type ProjectCreationMode = "idea" | "describe" | "upload" | "jira" | null
 
 interface NewProjectModalProps {
     open: boolean
@@ -19,6 +20,7 @@ interface NewProjectModalProps {
     onCreateFromIdea: () => void
     onCreateFromDescription: (data: { name: string; description: string; sector: string; targetAudience: string }) => void
     onCreateFromDocument: (file: File) => void
+    onCreateFromJira: (data: { name: string; description: string; sector: string; targetAudience: string; keyFeatures: string[] }) => void
 }
 
 export function NewProjectModal({
@@ -26,7 +28,8 @@ export function NewProjectModal({
     onOpenChange,
     onCreateFromIdea,
     onCreateFromDescription,
-    onCreateFromDocument
+    onCreateFromDocument,
+    onCreateFromJira
 }: NewProjectModalProps) {
     const [mode, setMode] = useState<ProjectCreationMode>(null)
     const [projectName, setProjectName] = useState("")
@@ -113,7 +116,7 @@ export function NewProjectModal({
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="grid md:grid-cols-3 gap-4 mt-4">
+                    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
                         {/* From Idea Generator */}
                         <Card
                             className="cursor-pointer hover:border-accent hover:shadow-lg transition-all group"
@@ -206,6 +209,37 @@ export function NewProjectModal({
                                     <span>Reuse existing docs</span>
                                 </div>
                                 <Badge variant="secondary" className="mt-2">Coming Soon</Badge>
+                            </CardContent>
+                        </Card>
+
+                        {/* Import from JIRA */}
+                        <Card
+                            className="cursor-pointer hover:border-accent hover:shadow-lg transition-all group"
+                            onClick={() => setMode("jira")}
+                        >
+                            <CardHeader>
+                                <div className="w-12 h-12 bg-blue-600/10 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                                    <Server className="w-6 h-6 text-blue-600" />
+                                </div>
+                                <CardTitle className="text-lg">Import from JIRA</CardTitle>
+                                <CardDescription className="text-sm">
+                                    Analyze existing backlog from JIRA
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <CheckCircle2 className="w-3 h-3 text-blue-600" />
+                                    <span>Connect your JIRA</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <CheckCircle2 className="w-3 h-3 text-blue-600" />
+                                    <span>AI infers product strategy</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <CheckCircle2 className="w-3 h-3 text-blue-600" />
+                                    <span>Migrate in minutes</span>
+                                </div>
+                                <Badge variant="outline" className="mt-2 border-blue-600 text-blue-600">New</Badge>
                             </CardContent>
                         </Card>
                     </div>
@@ -342,6 +376,39 @@ export function NewProjectModal({
                                         Upload & Create (Coming Soon)
                                     </>
                                 )}
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+        )
+    }
+
+    if (mode === "jira") {
+        return (
+            <Dialog open={open} onOpenChange={handleClose}>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="text-2xl">Import from JIRA</DialogTitle>
+                        <DialogDescription>
+                            Connect your JIRA project and let AI analyze your backlog to create a product strategy
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="mt-4">
+                        <JiraImport onImport={(idea) => {
+                            onCreateFromJira({
+                                name: idea.title,
+                                description: idea.description,
+                                sector: idea.sector,
+                                targetAudience: idea.targetAudience,
+                                keyFeatures: idea.keyFeatures
+                            })
+                            handleClose()
+                        }} />
+                        <div className="flex justify-start mt-4">
+                            <Button variant="outline" onClick={() => setMode(null)}>
+                                Back
                             </Button>
                         </div>
                     </div>
