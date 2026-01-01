@@ -8,13 +8,16 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Lightbulb, Sparkles, Plus, RefreshCw, AlertCircle } from "lucide-react"
+import { Separator } from "@/components/ui/separator"
+import { Lightbulb, Sparkles, Plus, RefreshCw, AlertCircle, FileInput } from "lucide-react"
 import { ApiKeyManager } from "@/lib/api-key-manager"
 import { ApiKeySetup } from "@/components/api-key-setup"
 import { GlobalUsageCounter } from "@/lib/global-usage-counter"
 import type { InputMode } from "@/types/user-story"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { JiraImport } from "@/components/jira-import"
 
 interface IdeaGeneratorProps {
   onCreateProject: (idea: GeneratedIdea, mode: InputMode) => void
@@ -257,126 +260,145 @@ Return ONLY a JSON array with this exact structure:
         </p>
       </div>
 
-      {/* Model selection UI, goes above input section */}
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        <Label htmlFor="model-select" className="font-semibold">AI Provider:</Label>
-        <div className="flex gap-1">
-          {['Gemini', 'Claude'].map(m => (
-            <Button
-              key={m}
-              type="button"
-              variant={selectedModel === m ? 'default' : 'outline'}
-              onClick={() => setSelectedModel(m as any)}
-              className={`px-4 py-2 ${selectedModel === m ? '' : 'bg-transparent'}`}
-            >
-              {m}
-            </Button>
-          ))}
-        </div>
-        <span className="text-xs text-muted-foreground ml-2">Currently using <strong>{selectedModel}</strong> for idea generation</span>
-      </div>
 
-      {/* Input Section */}
-      <Card className="bg-card border-border mb-8">
-        <CardHeader>
-          <CardTitle>Generate New Ideas</CardTitle>
-          <CardDescription>Enter a keyword and select a sector to generate tailored product ideas</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* API Key Status Indicator */}
-          {(() => {
-            const getApiKeyMessage = () => {
-              switch (selectedModel) {
-                case 'Gemini':
-                  return {
-                    title: "Gemini API Key Required",
-                    message: "You'll need to set your Gemini API key to generate ideas.",
-                    color: "blue"
-                  };
-                case 'Claude':
-                  return {
-                    title: "Claude API Key Required",
-                    message: "You'll need to set your Claude API key to generate ideas.",
-                    color: "orange"
-                  };
-                default:
-                  return {
-                    title: "API Key Required",
-                    message: "You'll need to set the appropriate API key.",
-                    color: "gray"
-                  };
-              }
-            };
+      {/* Tabs for Creation Method */}
+      <Tabs defaultValue="ai-generate" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 mb-8">
+          <TabsTrigger value="ai-generate">AI Ideation</TabsTrigger>
+          <TabsTrigger value="jira-import">Import from JIRA</TabsTrigger>
+        </TabsList>
 
-            const keyInfo = getApiKeyMessage();
-            const hasApiKeyForSelectedModel = ApiKeyManager.hasApiKey(selectedModel === 'Gemini' ? 'gemini' : 'anthropic');
-
-            return !hasApiKeyForSelectedModel ? (
-              <div className="bg-yellow-500/10 border-2 border-yellow-500 rounded-lg p-6 text-center">
-                <div className="flex justify-center mb-4">
-                  <AlertCircle className="w-12 h-12 text-yellow-500" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">API Key Not Configured</h3>
-                  <p className="mt-1">Please set your {selectedModel} API key in Settings to generate ideas.</p>
-                </div>
-              </div>
-            ) : null;
-          })()}
-
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="keyword">Keyword</Label>
-              <Input
-                id="keyword"
-                placeholder="e.g., productivity, health, education"
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-              />
+        <TabsContent value="ai-generate">
+          {/* Model selection UI, goes above input section */}
+          <div className="mb-6 flex flex-wrap items-center gap-3">
+            <Label htmlFor="model-select" className="font-semibold">AI Provider:</Label>
+            <div className="flex gap-1">
+              {['Gemini', 'Claude'].map(m => (
+                <Button
+                  key={m}
+                  type="button"
+                  variant={selectedModel === m ? 'default' : 'outline'}
+                  onClick={() => setSelectedModel(m as any)}
+                  className={`px-4 py-2 ${selectedModel === m ? '' : 'bg-transparent'}`}
+                >
+                  {m}
+                </Button>
+              ))}
             </div>
-            <div>
-              <Label htmlFor="sector">Sector (Optional)</Label>
-              <Select value={selectedSector} onValueChange={setSelectedSector}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a sector" />
-                </SelectTrigger>
-                <SelectContent>
-                  {SECTORS.map((sector) => (
-                    <SelectItem key={sector} value={sector}>
-                      {sector}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <span className="text-xs text-muted-foreground ml-2">Currently using <strong>{selectedModel}</strong> for idea generation</span>
           </div>
 
-          {/* Error Display */}
-          {error && (
-            <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3">
-              <div className="flex items-center gap-2 text-destructive">
-                <AlertCircle className="h-4 w-4" />
-                <span className="font-medium">Error:</span>
-                <span>{error}</span>
-              </div>
-            </div>
-          )}
+          {/* Input Section */}
+          <Card className="bg-card border-border mb-8">
+            <CardHeader>
+              <CardTitle>Generate New Ideas</CardTitle>
+              <CardDescription>Enter a keyword and select a sector to generate tailored product ideas</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* API Key Status Indicator */}
+              {(() => {
+                const getApiKeyMessage = () => {
+                  switch (selectedModel) {
+                    case 'Gemini':
+                      return {
+                        title: "Gemini API Key Required",
+                        message: "You'll need to set your Gemini API key to generate ideas.",
+                        color: "blue"
+                      };
+                    case 'Claude':
+                      return {
+                        title: "Claude API Key Required",
+                        message: "You'll need to set your Claude API key to generate ideas.",
+                        color: "orange"
+                      };
+                    default:
+                      return {
+                        title: "API Key Required",
+                        message: "You'll need to set the appropriate API key.",
+                        color: "gray"
+                      };
+                  }
+                };
 
-          <Button onClick={handleGenerate} disabled={!keyword.trim() || isGenerating} className="w-full">
-            {isGenerating ? (
-              <>
-                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                Generating Ideas...
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4 mr-2" />
-                Generate Ideas
-              </>
-            )}
-          </Button>
-        </CardContent>
-      </Card>
+                const keyInfo = getApiKeyMessage();
+                const hasApiKeyForSelectedModel = ApiKeyManager.hasApiKey(selectedModel === 'Gemini' ? 'gemini' : 'anthropic');
+
+                return !hasApiKeyForSelectedModel ? (
+                  <div className="bg-yellow-500/10 border-2 border-yellow-500 rounded-lg p-6 text-center">
+                    <div className="flex justify-center mb-4">
+                      <AlertCircle className="w-12 h-12 text-yellow-500" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold mb-2">API Key Not Configured</h3>
+                      <p className="mt-1">Please set your {selectedModel} API key in Settings to generate ideas.</p>
+                    </div>
+                  </div>
+                ) : null;
+              })()}
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="keyword">Keyword</Label>
+                  <Input
+                    id="keyword"
+                    placeholder="e.g., productivity, health, education"
+                    value={keyword}
+                    onChange={(e) => setKeyword(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="sector">Sector (Optional)</Label>
+                  <Select value={selectedSector} onValueChange={setSelectedSector}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a sector" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SECTORS.map((sector) => (
+                        <SelectItem key={sector} value={sector}>
+                          {sector}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Error Display */}
+              {error && (
+                <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3">
+                  <div className="flex items-center gap-2 text-destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <span className="font-medium">Error:</span>
+                    <span>{error}</span>
+                  </div>
+                </div>
+              )}
+
+              <Button onClick={handleGenerate} disabled={!keyword.trim() || isGenerating} className="w-full">
+                {isGenerating ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Generating Ideas...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Generate Ideas
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="jira-import">
+          <JiraImport onImport={(idea) => {
+            setGeneratedIdeas([idea]);
+            setEditableIdeas([idea]);
+            setKeyword(`Imported: ${idea.title}`);
+          }} />
+        </TabsContent>
+      </Tabs>
 
       {/* Ideas Display */}
       <div className="space-y-6">
