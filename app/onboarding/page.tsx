@@ -23,6 +23,7 @@ function OnboardingContent() {
     const searchParams = useSearchParams()
     const { toast } = useToast()
     const isEditMode = searchParams.get("mode") === "edit"
+    const isTeamSetupMode = searchParams.get("mode") === "team-setup"
 
     const [isChecking, setIsChecking] = useState(true)
     const [initialData, setInitialData] = useState<Partial<OnboardingData>>({})
@@ -44,8 +45,17 @@ function OnboardingContent() {
                         if (res.ok) {
                             const userProfile = await res.json()
 
+                            // If in team-setup mode, populate data and set to team mode
+                            if (isTeamSetupMode && userProfile) {
+                                setInitialData({
+                                    name: userProfile.name || user.fullName || "",
+                                    role: userProfile.role || "",
+                                    usageType: "team" // Force team mode for this flow
+                                })
+                                // Don't redirect - let them complete team setup
+                            }
                             // If in edit mode, populate initial data
-                            if (isEditMode && userProfile) {
+                            else if (isEditMode && userProfile) {
                                 setInitialData({
                                     name: userProfile.name || user.fullName || "",
                                     role: userProfile.role || "",
@@ -53,7 +63,7 @@ function OnboardingContent() {
                                     // productDescription isn't stored in profile currently, but could be added if needed
                                 })
                             }
-                            // Only redirect if NOT in edit mode and onboarding is already completed
+                            // Only redirect if NOT in edit mode, NOT in team-setup mode, and onboarding is already completed
                             else if (userProfile?.onboardingCompleted) {
                                 router.push("/")
                                 return
@@ -76,7 +86,7 @@ function OnboardingContent() {
         }
 
         checkStatus()
-    }, [user, isLoaded, isSignedIn, router, isEditMode])
+    }, [user, isLoaded, isSignedIn, router, isEditMode, isTeamSetupMode])
 
     const handleOnboardingComplete = async (data: OnboardingData) => {
         if (!user) return
@@ -117,10 +127,13 @@ function OnboardingContent() {
                 }
                 localStorage.setItem("smello-user-onboarding", JSON.stringify(permanentData))
 
-                // Redirect to home or show success message
+                // Redirect to appropriate destination
                 if (isEditMode) {
                     // Use replace to prevent back-button loop
                     router.replace("/settings")
+                } else if (isTeamSetupMode || data.usageType === "team") {
+                    // After team setup, go to teams dashboard
+                    router.replace("/teams")
                 } else {
                     router.replace("/")
                 }
@@ -138,6 +151,9 @@ function OnboardingContent() {
     const handleBack = () => {
         if (isEditMode) {
             router.push("/settings")
+        } else if (isTeamSetupMode) {
+            // Go back to home (PM Tools) if canceling team setup
+            router.push("/")
         } else {
             router.push("/")
         }
@@ -161,6 +177,7 @@ function OnboardingContent() {
             onBack={handleBack}
             initialData={initialData}
             isEditMode={isEditMode}
+            initialStep={isTeamSetupMode ? 5 : undefined}
         />
     )
 }

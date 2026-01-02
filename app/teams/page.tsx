@@ -2,15 +2,15 @@
 
 import { useState, useEffect } from "react"
 import { TeamDashboard } from "@/components/team-dashboard"
+import { JoinOrganization } from "@/components/teams/join-organization"
 import { useUser } from "@clerk/nextjs"
-import { AppHeader } from "@/components/app-header"
-import { SidebarNavigation } from "@/components/sidebar-navigation"
 import { useRouter } from "next/navigation"
 
 export default function TeamsPage() {
     const { user, isLoaded, isSignedIn } = useUser()
     const router = useRouter()
     const [onboardingData, setOnboardingData] = useState<any>(null)
+    const [isCheckingData, setIsCheckingData] = useState(true)
 
     useEffect(() => {
         const data = localStorage.getItem("smello-user-onboarding")
@@ -26,9 +26,16 @@ export default function TeamsPage() {
         } else if (isLoaded && !isSignedIn) {
             router.push("/")
         }
+        setIsCheckingData(false)
     }, [isLoaded, isSignedIn, router])
 
-    if (!isLoaded) return null
+    if (!isLoaded || isCheckingData) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="animate-pulse text-muted-foreground">Loading...</div>
+            </div>
+        )
+    }
 
     if (!isSignedIn) {
         return (
@@ -38,21 +45,54 @@ export default function TeamsPage() {
         )
     }
 
+    // User is signed in but hasn't joined an organization yet
+    // Show the join organization search interface
     if (onboardingData && !onboardingData.organizationId) {
+        const handleJoinSuccess = (orgId: string, teamId: string, orgName: string, teamName: string) => {
+            // Update localStorage with organization data
+            const updatedData = {
+                ...onboardingData,
+                usageType: "team",
+                organizationId: orgId,
+                teamId: teamId,
+                organizationName: orgName,
+                teamName: teamName
+            }
+            localStorage.setItem("smello-user-onboarding", JSON.stringify(updatedData))
+            setOnboardingData(updatedData)
+
+            // Also update the server profile
+            if (user) {
+                fetch(`/api/profile/${user.id}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        selectedPath: "team",
+                        organizationId: orgId,
+                        teamId: teamId,
+                        organizationName: orgName
+                    }),
+                }).catch(err => console.error("Failed to update profile:", err))
+            }
+        }
+
+        const handleBackToPM = () => {
+            // Switch back to PM mode
+            const data = JSON.parse(localStorage.getItem("smello-user-onboarding") || "{}")
+            data.usageType = "personal"
+            localStorage.setItem("smello-user-onboarding", JSON.stringify(data))
+            router.push("/")
+        }
+
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen p-8 text-center space-y-4">
-                <h2 className="text-2xl font-bold">Team Setup Required</h2>
-                <p className="text-muted-foreground">You need to set up an organization before accessing the Team Dashboard.</p>
-                <button
-                    onClick={() => router.push("/onboarding")}
-                    className="px-6 py-2 bg-primary text-primary-foreground rounded-lg"
-                >
-                    Complete Setup
-                </button>
-            </div>
+            <JoinOrganization
+                onJoinSuccess={handleJoinSuccess}
+                onBackToPM={handleBackToPM}
+            />
         )
     }
 
+    // User has an organization, show the Team Dashboard
     return (
         <TeamDashboard
             organizationId={onboardingData?.organizationId}
