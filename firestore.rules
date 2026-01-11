@@ -83,8 +83,8 @@ service cloud.firestore {
     // Organizations - ONLY super admins can create
     // Members and Super Admins can read
     match /organizations/{orgId} {
-      // Members and Super Admins can read
-      allow read: if isOrgMember(orgId);
+      // Allow authenticated users to search/read organizations to join them
+      allow read: if isAuthenticated();
       // ONLY super admins can create organizations
       allow create: if isSuperAdmin();
       // Org admins and Super Admins can update/delete

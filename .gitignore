@@ -7,6 +7,7 @@
 /node_modules
 /.pnp
 .pnp.js
+smello-30cc5-firebase-adminsdk-fbsvc-a1b2e67b68.json
 
 # testing
 /coverage
@@ -101,3 +102,5 @@ ENV/
 *.user
 *.userosscache
 *.sln.docstates
+# clerk configuration (can include secrets)
+/.clerk/

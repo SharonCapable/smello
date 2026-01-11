@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -35,9 +35,12 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronRight,
-  Users
+  Users,
+  Shield // Added Shield icon
 } from "lucide-react"
 import { useTheme } from "next-themes"
+import { useAuth } from "@/hooks/use-auth"
+import { isSuperAdmin as checkSuperAdmin } from "@/lib/firestore-service"
 
 type AppState =
   | "landing"
@@ -101,9 +104,19 @@ function SidebarContent({
     "System": false
   })
 
-  useState(() => {
+  // Admin Check
+  const { user } = useAuth()
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+
+  useEffect(() => {
+    if (user) {
+      checkSuperAdmin(user.uid).then(setIsSuperAdmin)
+    }
+  }, [user])
+
+  useEffect(() => {
     setMounted(true)
-  })
+  }, [])
 
   const toggleGroup = (group: string) => {
     setOpenGroups(prev => ({ ...prev, [group]: !prev[group] }))
@@ -276,7 +289,22 @@ function SidebarContent({
       {/* Footer Actions */}
       <div className="border-t border-border/50 p-2 space-y-2">
 
-        <div className="pt-2">
+        <div className="pt-2 space-y-2">
+          {/* Admin Dashboard Button (Conditioned) */}
+          {isSuperAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.location.href = '/admin'}
+              className={`w-full justify-start bg-primary/5 text-primary hover:bg-primary/10 border-primary/20 ${isCollapsed && !isMobile ? 'px-2 justify-center' : 'px-4'}`}
+              title={isCollapsed ? "Switch to Admin Dashboard" : undefined}
+              type="button"
+            >
+              <Shield className="w-4 h-4 flex-shrink-0" />
+              {(!isCollapsed || isMobile) && <span className="ml-2 font-bold uppercase tracking-widest text-[10px]">Admin Dashboard</span>}
+            </Button>
+          )}
+
           <Button
             variant="outline"
             size="sm"

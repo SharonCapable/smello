@@ -3,11 +3,11 @@
 import { useState, useEffect } from "react"
 import { TeamDashboard } from "@/components/team-dashboard"
 import { JoinOrganization } from "@/components/teams/join-organization"
-import { useUser } from "@clerk/nextjs"
+import { useAuth } from "@/hooks/use-auth"
 import { useRouter } from "next/navigation"
 
 export default function TeamsPage() {
-    const { user, isLoaded, isSignedIn } = useUser()
+    const { user, isLoaded, isSignedIn } = useAuth()
     const router = useRouter()
     const [onboardingData, setOnboardingData] = useState<any>(null)
     const [isCheckingData, setIsCheckingData] = useState(true)
@@ -48,7 +48,7 @@ export default function TeamsPage() {
     // User is signed in but hasn't joined an organization yet
     // Show the join organization search interface
     if (onboardingData && !onboardingData.organizationId) {
-        const handleJoinSuccess = (orgId: string, teamId: string, orgName: string, teamName: string) => {
+        const handleJoinSuccess = async (orgId: string, teamId: string, orgName: string, teamName: string) => {
             // Update localStorage with organization data
             const updatedData = {
                 ...onboardingData,
@@ -63,16 +63,24 @@ export default function TeamsPage() {
 
             // Also update the server profile
             if (user) {
-                fetch(`/api/profile/${user.id}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        selectedPath: "team",
-                        organizationId: orgId,
-                        teamId: teamId,
-                        organizationName: orgName
-                    }),
-                }).catch(err => console.error("Failed to update profile:", err))
+                try {
+                    const token = await user.getIdToken()
+                    await fetch(`/api/profile/${user.uid}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                            selectedPath: "team",
+                            organizationId: orgId,
+                            teamId: teamId,
+                            organizationName: orgName
+                        }),
+                    })
+                } catch (err) {
+                    console.error("Failed to update profile:", err)
+                }
             }
         }
 

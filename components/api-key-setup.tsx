@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Checkbox } from "@/components/ui/checkbox"
 import { AlertCircle, Key, Eye, EyeOff, Loader2 } from "lucide-react"
 import { ApiKeyManager } from "@/lib/api-key-manager"
-import { useUser } from '@clerk/nextjs'
+import { useAuth } from "@/hooks/use-auth"
 import { useToast } from '@/hooks/use-toast'
 // ...
 
@@ -30,7 +30,7 @@ export function ApiKeySetup({ isOpen, onApiKeySet, onClose, initialKey }: ApiKey
   const [showApiKey, setShowApiKey] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [saveToAccount, setSaveToAccount] = useState(true)
-  const { user, isLoaded, isSignedIn } = useUser()
+  const { user, isLoaded, isSignedIn } = useAuth()
   const { toast } = useToast()
 
   useEffect(() => {
@@ -60,10 +60,11 @@ export function ApiKeySetup({ isOpen, onApiKeySet, onClose, initialKey }: ApiKey
       if (data.valid) {
         ApiKeyManager.setApiKey(apiKey, provider)
 
-        if (saveToAccount) {
+        if (saveToAccount && user) {
           try {
+            const token = await user.getIdToken()
             const payload = provider === 'gemini' ? { geminiKey: apiKey } : { claudeKey: apiKey }
-            await ApiKeyManager.saveServerKeys(payload)
+            await ApiKeyManager.saveServerKeys(payload, token)
             toast({ title: 'Saved', description: `${provider === 'anthropic' ? 'Claude' : 'Gemini'} API key saved to your account` })
           } catch (e) {
             toast({ title: 'Saved locally', description: 'Key stored locally; account save failed' })

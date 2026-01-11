@@ -172,10 +172,13 @@ export class ApiKeyManager {
   }
 
   // Fetch stored keys from server (if signed in) and merge into local enhanced storage
-  static async loadServerKeys(): Promise<void> {
+  static async loadServerKeys(token?: string): Promise<void> {
     if (typeof window === 'undefined') return
     try {
-      const res = await fetch('/api/keys')
+      const headers: Record<string, string> = {}
+      if (token) headers['Authorization'] = `Bearer ${token}`
+
+      const res = await fetch('/api/keys', { headers })
       if (!res.ok) return
       const data = await res.json()
       const enhancedStored = localStorage.getItem(this.ENHANCED_STORAGE_KEY)
@@ -202,10 +205,13 @@ export class ApiKeyManager {
   }
 
   // Save keys to server (authenticated). Returns true on success.
-  static async saveServerKeys(keys: { geminiKey?: string; claudeKey?: string }): Promise<boolean> {
+  static async saveServerKeys(keys: { geminiKey?: string; claudeKey?: string }, token?: string): Promise<boolean> {
     if (typeof window === 'undefined') return false
     try {
-      const res = await fetch('/api/keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(keys) })
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+
+      const res = await fetch('/api/keys', { method: 'POST', headers, body: JSON.stringify(keys) })
       if (!res.ok) return false
       // Merge into local storage as well
       if (keys.geminiKey) this.setApiKey(keys.geminiKey, 'gemini')

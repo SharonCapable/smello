@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, Suspense } from "react"
-import { useUser } from "@clerk/nextjs"
+import { useAuth } from "@/hooks/use-auth"
 import { useRouter, useSearchParams } from "next/navigation"
 import { OnboardingFlow } from "@/components/onboarding-flow"
 import { Loader2 } from "lucide-react"
@@ -18,7 +18,7 @@ interface OnboardingData {
 }
 
 function OnboardingContent() {
-    const { user, isLoaded, isSignedIn } = useUser()
+    const { user, isLoaded, isSignedIn } = useAuth()
     const router = useRouter()
     const searchParams = useSearchParams()
     const { toast } = useToast()
@@ -39,16 +39,21 @@ function OnboardingContent() {
 
             if (user) {
                 try {
-                    const uid = user.id
+                    const uid = user.uid
                     if (uid) {
-                        const res = await fetch(`/api/profile/${uid}`)
+                        const token = await user.getIdToken()
+                        const res = await fetch(`/api/profile/${uid}`, {
+                            headers: {
+                                'Authorization': `Bearer ${token}`
+                            }
+                        })
                         if (res.ok) {
                             const userProfile = await res.json()
 
                             // If in team-setup mode, populate data and set to team mode
                             if (isTeamSetupMode && userProfile) {
                                 setInitialData({
-                                    name: userProfile.name || user.fullName || "",
+                                    name: userProfile.name || user.displayName || "",
                                     role: userProfile.role || "",
                                     usageType: "team" // Force team mode for this flow
                                 })
@@ -57,7 +62,7 @@ function OnboardingContent() {
                             // If in edit mode, populate initial data
                             else if (isEditMode && userProfile) {
                                 setInitialData({
-                                    name: userProfile.name || user.fullName || "",
+                                    name: userProfile.name || user.displayName || "",
                                     role: userProfile.role || "",
                                     usageType: userProfile.selectedPath === "team" ? "team" : "personal"
                                     // productDescription isn't stored in profile currently, but could be added if needed
@@ -92,18 +97,22 @@ function OnboardingContent() {
         if (!user) return
 
         try {
-            const uid = user.id
+            const uid = user.uid
 
             if (uid) {
+                const token = await user.getIdToken()
                 // Update user profile with onboarding data via server-side API
                 await fetch(`/api/profile/${uid}`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
                     body: JSON.stringify({
-                        email: user.primaryEmailAddress?.emailAddress || '',
+                        email: user.email || '',
                         name: data.name,
                         displayName: data.name,
-                        photoURL: user.imageUrl || '',
+                        photoURL: user.photoURL || '',
                         role: data.role,
                         selectedPath: data.usageType === "personal" ? "pm" : "team",
                         onboardingCompleted: true,

@@ -13,14 +13,13 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { LogIn, LogOut, User, Settings, Sparkles, Zap, Brain, Briefcase } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { useUser, useClerk } from "@clerk/nextjs"
+import { useAuth } from "@/hooks/use-auth"
 import { GlobalUsageCounter } from "@/lib/global-usage-counter"
 import { useRouter } from 'next/navigation'
 import { setUserId } from "@/lib/storage-hybrid"
 
 export function UserProfile() {
-    const { user, isLoaded, isSignedIn } = useUser()
-    const { signOut, openSignIn } = useClerk()
+    const { user, isLoaded, isSignedIn, signOut, signInWithGoogle } = useAuth()
     const [mounted, setMounted] = useState(false)
     const [remainingOperations, setRemainingOperations] = useState(0)
     const [activeProvider, setActiveProvider] = useState<string | null>(null)
@@ -36,15 +35,18 @@ export function UserProfile() {
         const loadUserProfile = async () => {
             if (isLoaded && isSignedIn && user) {
                 try {
-                    const uid = user.id
+                    const uid = user.uid
                     if (uid) {
                         // Set user ID for hybrid storage
                         setUserId(uid)
 
-                        // Load profile from Firestore
-                        // Fetch profile from server-side API (firebase-admin) to avoid client rules issues
                         try {
-                            const res = await fetch(`/api/profile/${uid}`)
+                            const token = await user.getIdToken()
+                            const res = await fetch(`/api/profile/${uid}`, {
+                                headers: {
+                                    'Authorization': `Bearer ${token}`
+                                }
+                            })
                             if (res.ok) {
                                 const profile = await res.json()
                                 if (profile) {
@@ -104,8 +106,8 @@ export function UserProfile() {
     }
 
     // Display session user name by default, but override with onboarding name if available
-    const displayUserName = userName || user?.fullName || "Guest"
-    const displayUserEmail = user?.primaryEmailAddress?.emailAddress || ""
+    const displayUserName = userName || user?.displayName || "Guest"
+    const displayUserEmail = user?.email || ""
 
     if (!isLoaded) {
         return (
@@ -125,7 +127,7 @@ export function UserProfile() {
         return (
             <div className="p-4 border-t border-border/50">
                 <Button
-                    onClick={() => openSignIn()}
+                    onClick={() => signInWithGoogle()}
                     className="w-full justify-start gap-2"
                     variant="outline"
                 >
@@ -153,7 +155,7 @@ export function UserProfile() {
                 <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="w-full justify-start gap-3 h-auto p-2 hover:bg-muted/50">
                         <Avatar className="w-10 h-10 border border-border">
-                            <AvatarImage src={user?.imageUrl || ""} alt={displayUserName} />
+                            <AvatarImage src={user?.photoURL || ""} alt={displayUserName} />
                             <AvatarFallback>{userInitials}</AvatarFallback>
                         </Avatar>
                         <div className="flex-1 text-left overflow-hidden">
@@ -242,7 +244,7 @@ export function UserProfile() {
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
-                        onClick={async () => { await signOut({ redirectUrl: '/' }) }}
+                        onClick={async () => { await signOut() }}
                         className="text-red-500 focus:text-red-500 cursor-pointer"
                     >
                         <LogOut className="w-4 h-4 mr-2" />

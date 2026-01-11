@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
-import { useUser } from "@clerk/nextjs"
+import { useAuth } from "@/hooks/use-auth"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { acceptOrganizationInvite, InviteDoc } from "@/lib/firestore-service"
@@ -13,7 +13,7 @@ import { Loader2, CheckCircle2, XCircle, Mail } from "lucide-react"
 function AcceptInviteContent() {
     const searchParams = useSearchParams()
     const router = useRouter()
-    const { user, isLoaded } = useUser()
+    const { user, isLoaded, signInWithGoogle } = useAuth()
     const [invite, setInvite] = useState<InviteDoc | null>(null)
     const [loading, setLoading] = useState(true)
     const [accepting, setAccepting] = useState(false)
@@ -31,7 +31,7 @@ function AcceptInviteContent() {
 
         const fetchInvite = async () => {
             try {
-                const inviteRef = doc(db, 'invites', inviteId)
+                const inviteRef = doc(db as any, 'invites', inviteId)
                 const inviteSnap = await getDoc(inviteRef)
 
                 if (!inviteSnap.exists()) {
@@ -71,7 +71,7 @@ function AcceptInviteContent() {
         if (!user || !invite) return
 
         // Check if email matches
-        const userEmail = user.primaryEmailAddress?.emailAddress
+        const userEmail = user.email
         if (!userEmail) {
             setError('No email address found for your account')
             return
@@ -86,9 +86,9 @@ function AcceptInviteContent() {
         try {
             await acceptOrganizationInvite(
                 invite.id,
-                user.id,
+                user.uid,
                 userEmail,
-                user.fullName || user.firstName || 'User'
+                user.displayName || 'User'
             )
 
             setSuccess(true)
@@ -185,8 +185,8 @@ function AcceptInviteContent() {
                                 )}
                             </div>
                         )}
-                        <Button onClick={() => router.push('/sign-in')} className="w-full">
-                            Sign In to Continue
+                        <Button onClick={() => signInWithGoogle()} className="w-full">
+                            Sign In with Google to Continue
                         </Button>
                     </CardContent>
                 </Card>
@@ -203,33 +203,33 @@ function AcceptInviteContent() {
                         You're Invited!
                     </CardTitle>
                     <CardDescription>
-                        {invite.invitedByName} invited you to join their organization
+                        {invite!.invitedByName} invited you to join their organization
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="p-4 bg-accent/5 rounded-lg space-y-3">
                         <div>
                             <p className="text-sm text-muted-foreground">Organization</p>
-                            <p className="text-xl font-bold">{invite.orgName}</p>
+                            <p className="text-xl font-bold">{invite!.orgName}</p>
                         </div>
                         <div>
                             <p className="text-sm text-muted-foreground">Your Role</p>
-                            <p className="font-semibold capitalize">{invite.role.replace('_', ' ')}</p>
+                            <p className="font-semibold capitalize">{invite!.role.replace('_', ' ')}</p>
                         </div>
-                        {invite.message && (
+                        {invite!.message && (
                             <div>
                                 <p className="text-sm text-muted-foreground">Message</p>
-                                <p className="text-sm italic">"{invite.message}"</p>
+                                <p className="text-sm italic">"{invite!.message}"</p>
                             </div>
                         )}
                         <div>
                             <p className="text-sm text-muted-foreground">Invited by</p>
-                            <p className="font-semibold">{invite.invitedByName}</p>
+                            <p className="font-semibold">{invite!.invitedByName}</p>
                         </div>
                         <div>
                             <p className="text-sm text-muted-foreground">Expires</p>
                             <p className="text-sm">
-                                {new Date((invite.expiresAt as any).toDate()).toLocaleDateString()}
+                                {new Date((invite!.expiresAt as any).toDate()).toLocaleDateString()}
                             </p>
                         </div>
                     </div>
@@ -262,7 +262,7 @@ function AcceptInviteContent() {
                     </div>
 
                     <p className="text-xs text-muted-foreground text-center">
-                        By accepting, you'll gain access to {invite.orgName}'s projects and team collaboration features
+                        By accepting, you'll gain access to {invite!.orgName}'s projects and team collaboration features
                     </p>
                 </CardContent>
             </Card>

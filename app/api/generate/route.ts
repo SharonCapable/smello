@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
-import admin, { initAdmin } from '@/lib/firebase-admin'
-import { auth } from '@clerk/nextjs/server'
+import admin, { initAdmin, adminAuth } from '@/lib/firebase-admin'
 import { decryptText } from '@/lib/crypto'
+import { headers } from 'next/headers'
 
 
 export async function POST(req: Request) {
@@ -13,12 +13,25 @@ export async function POST(req: Request) {
 
     // Attempt to resolve per-provider API key following priority:
     // 1) Server env key (with free tier limit)
-    // 2) User's Google OAuth access token from Clerk (for Gemini)
-    // 3) Per-user stored API key in Firestore (apiKeys collection)
-    // 4) Client-provided key
+    // 2) Per-user stored API key in Firestore (apiKeys collection)
+    // 3) Client-provided key
 
     // Get session (require sign-in for generation)
-    const { userId } = await auth()
+    // Verify Firebase ID Token
+    const headersList = await headers()
+    const authHeader = headersList.get('Authorization')
+    let userId: string | null = null
+
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.split('Bearer ')[1]
+      try {
+        const decodedToken = await adminAuth().verifyIdToken(token)
+        userId = decodedToken.uid
+      } catch (e) {
+        console.warn('Firebase token verification failed', e)
+      }
+    }
+
     if (!userId) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 })
 
     const sessionUid = userId
@@ -43,7 +56,7 @@ export async function POST(req: Request) {
     }
 
     if (provider === 'gemini') {
-      // priority: process.env -> session.accessToken (bearer) -> storedKeys.geminiKey -> clientApiKey
+      // priority: process.env -> storedKeys.geminiKey -> clientApiKey
 
       let serverKeyLimitExceeded = false
       const envKey = process.env.GEMINI_API_KEY
@@ -125,38 +138,9 @@ export async function POST(req: Request) {
         }
       }
 
-      // 2. OAuth Token (Gemini specific) - Try Clerk OAuth
-      // Only runs if server key was missing or limit exceeded
-      try {
-        // Import clerkClient dynamically to get OAuth token
-        const { clerkClient } = await import('@clerk/nextjs/server')
-        const client = await clerkClient()
-
-        const oauthTokens = await client.users.getUserOauthAccessToken(sessionUid, 'google')
-
-        if (oauthTokens && oauthTokens.data.length > 0) {
-          const accessTokenToUse = oauthTokens.data[0].token
-
-          if (accessTokenToUse) {
-            const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessTokenToUse}` },
-              body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.7 } }),
-            })
-
-            if (response.ok) {
-              const data = await response.json()
-              return NextResponse.json(data)
-            } else {
-              // OAuth token might not have the right scopes, fall through to next option
-              console.log('OAuth token failed for Gemini, trying next method')
-            }
-          }
-        }
-      } catch (e: any) {
-        console.log('OAuth token not available or invalid:', e.message)
-        // Fallthrough to next key sources (stored key / client key)
-      }
+      // 2. Removed Clerk OAuth Token Logic
+      // Previously attempted to fetch user's google oauth token via Clerk.
+      // With Firebase, we'd need to pass it from client, but we'll stick to stored keys or client API key for now.
 
       // 3. Stored user key
       const storedKey = storedKeys?.geminiKey || null

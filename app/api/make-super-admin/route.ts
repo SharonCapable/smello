@@ -1,10 +1,25 @@
 import { NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
-import admin, { initAdmin } from '@/lib/firebase-admin'
+import { headers } from 'next/headers'
+import admin, { initAdmin, adminAuth } from '@/lib/firebase-admin'
+
+async function getSessionUid() {
+    const headersList = await headers()
+    const authHeader = headersList.get('Authorization')
+    if (authHeader?.startsWith('Bearer ')) {
+        const token = authHeader.split('Bearer ')[1]
+        try {
+            const decodedToken = await adminAuth().verifyIdToken(token)
+            return decodedToken.uid
+        } catch (e) {
+            console.warn('Firebase token verification failed', e)
+        }
+    }
+    return null
+}
 
 export async function POST() {
     try {
-        const { userId } = await auth()
+        const userId = await getSessionUid()
         if (!userId) {
             return NextResponse.json({ error: 'unauthenticated' }, { status: 401 })
         }
@@ -32,7 +47,7 @@ export async function POST() {
 
 export async function GET() {
     try {
-        const { userId } = await auth()
+        const userId = await getSessionUid()
         if (!userId) {
             return NextResponse.json({ error: 'unauthenticated' }, { status: 401 })
         }

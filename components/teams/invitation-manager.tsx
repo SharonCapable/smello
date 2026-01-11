@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
-import { useUser } from "@clerk/nextjs"
+import { useAuth } from "@/hooks/use-auth"
 import {
     sendOrganizationInvite,
     getPendingInvitesForUser,
@@ -47,7 +47,7 @@ interface BulkInvite {
 }
 
 export function InvitationManager({ organizationId, organizationName }: InvitationManagerProps) {
-    const { user } = useUser()
+    const { user } = useAuth()
     const { toast } = useToast()
     const [mode, setMode] = useState<'single' | 'bulk'>('single')
 
@@ -74,8 +74,8 @@ export function InvitationManager({ organizationId, organizationName }: Invitati
                 orgName: organizationName,
                 email: email.toLowerCase().trim(),
                 role,
-                invitedBy: user.id,
-                invitedByName: user.fullName || user.firstName || 'User',
+                invitedBy: user.uid,
+                invitedByName: user.displayName || 'User',
                 message: message.trim() || undefined,
             })
 
@@ -127,8 +127,8 @@ export function InvitationManager({ organizationId, organizationName }: Invitati
                     orgName: organizationName,
                     email: invite.email.toLowerCase().trim(),
                     role: invite.role,
-                    invitedBy: user.id,
-                    invitedByName: user.fullName || user.firstName || 'User',
+                    invitedBy: user.uid,
+                    invitedByName: user.displayName || 'User',
                 })
 
                 const link = `${window.location.origin}/accept-invite?id=${inviteId}`
@@ -507,18 +507,18 @@ export function InvitationManager({ organizationId, organizationName }: Invitati
 
 // Component to show pending invites for current user
 export function PendingInvites() {
-    const { user } = useUser()
+    const { user } = useAuth()
     const { toast } = useToast()
     const [invites, setInvites] = useState<InviteDoc[]>([])
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-        if (!user?.primaryEmailAddress?.emailAddress) return
+        if (!user?.email) return
 
         const fetchInvites = async () => {
             try {
                 const pendingInvites = await getPendingInvitesForUser(
-                    user.primaryEmailAddress!.emailAddress
+                    user.email!
                 )
                 setInvites(pendingInvites)
             } catch (error) {
@@ -537,9 +537,9 @@ export function PendingInvites() {
         try {
             await acceptOrganizationInvite(
                 invite.id,
-                user.id,
-                user.primaryEmailAddress!.emailAddress,
-                user.fullName || user.firstName || 'User'
+                user.uid,
+                user.email!,
+                user.displayName || 'User'
             )
 
             toast({

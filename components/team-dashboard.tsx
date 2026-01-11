@@ -13,7 +13,9 @@ import { OrganizationView } from "./teams/organization-view"
 import { TeamOverview } from "./teams/team-overview"
 import { Task } from "./teams/task-table"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Shield } from "lucide-react"
+import { useAuth } from "@/hooks/use-auth"
+import { isSuperAdmin as checkSuperAdmin } from "@/lib/firestore-service"
 
 interface TeamDashboardProps {
     onBack: () => void
@@ -34,6 +36,14 @@ export function TeamDashboard({ onBack, organizationId, teamId, organizationName
     const [activeTab, setActiveTab] = useState("personal-dashboard")
     const [teamTasks, setTeamTasks] = useState<Task[]>(INITIAL_TEAM_TASKS)
     const [currentTeam, setCurrentTeam] = useState({ id: teamId, name: teamName })
+    const { user } = useAuth()
+    const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+
+    React.useEffect(() => {
+        if (user) {
+            checkSuperAdmin(user.uid).then(setIsSuperAdmin)
+        }
+    }, [user])
 
     const handlePromoteTask = (task: Task) => {
         setTeamTasks(prev => [task, ...prev])
@@ -76,6 +86,7 @@ export function TeamDashboard({ onBack, organizationId, teamId, organizationName
             case "organization":
                 return (
                     <OrganizationView
+                        organizationId={organizationId || ""}
                         organizationName={organizationName}
                         onNavigateToTeam={handleNavigateToTeam}
                     />
@@ -134,8 +145,8 @@ export function TeamDashboard({ onBack, organizationId, teamId, organizationName
                 {renderContent()}
             </TeamsLayout>
 
-            {/* Absolute positioned back button for quick exit to individual toolkit */}
-            <div className="fixed bottom-4 left-4 z-50">
+            {/* Absolute positioned footer controls */}
+            <div className="fixed bottom-4 left-4 z-50 flex gap-2">
                 <Button
                     variant="secondary"
                     size="sm"
@@ -145,6 +156,18 @@ export function TeamDashboard({ onBack, organizationId, teamId, organizationName
                     <ArrowLeft className="w-4 h-4 mr-2" />
                     Back to Toolkit
                 </Button>
+
+                {isSuperAdmin && (
+                    <Button
+                        variant="default"
+                        size="sm"
+                        className="shadow-lg"
+                        onClick={() => window.location.href = '/admin'}
+                    >
+                        <Shield className="w-4 h-4 mr-2" />
+                        Admin Dashboard
+                    </Button>
+                )}
             </div>
         </div>
     )

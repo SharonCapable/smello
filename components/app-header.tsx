@@ -14,7 +14,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { LogIn, LogOut, User, Settings, Sparkles, Zap, Brain, Briefcase, Sun, Moon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { useUser, useClerk } from "@clerk/nextjs"
+import { useAuth } from "@/hooks/use-auth"
 import { useTheme } from "next-themes"
 import { GlobalUsageCounter } from "@/lib/global-usage-counter"
 import { setUserId } from "@/lib/storage-hybrid"
@@ -23,8 +23,7 @@ import { ModeSwitcher } from "@/components/mode-switcher"
 
 export function AppHeader() {
     const router = useRouter()
-    const { user, isLoaded, isSignedIn } = useUser()
-    const { signOut, openSignIn } = useClerk()
+    const { user, isLoaded, isSignedIn, signInWithGoogle, signOut } = useAuth()
     const { theme, setTheme } = useTheme()
     const [mounted, setMounted] = useState(false)
     const [remainingOperations, setRemainingOperations] = useState(0)
@@ -49,46 +48,40 @@ export function AppHeader() {
         }
 
         // Load user profile from Firestore
-        // Load user profile from Firestore via Server API
         const loadUserProfile = async () => {
             if (isLoaded && isSignedIn && user) {
                 try {
-                    const uid = user.id
+                    const uid = user.uid
                     if (uid) {
                         // Set user ID for hybrid storage
                         setUserId(uid)
 
                         // Load profile from Firestore via API to avoid permission issues
-                        const res = await fetch(`/api/profile/${uid}`)
-                        if (res.ok) {
-                            const profile = await res.json()
-                            if (profile) {
-                                if (profile.role) setUserRole(profile.role)
-                                if (profile.name) setUserName(profile.name)
+                        try {
+                            const token = await user.getIdToken()
+                            const res = await fetch(`/api/profile/${uid}`, {
+                                headers: {
+                                    'Authorization': `Bearer ${token}`
+                                }
+                            })
+                            if (res.ok) {
+                                const profile = await res.json()
+                                if (profile) {
+                                    if (profile.role) setUserRole(profile.role)
+                                    if (profile.name) setUserName(profile.name)
 
-                                // Sync Usage Stats from Server if available
-                                if (typeof profile.usageCount === 'number') {
-                                    // We need to update GlobalUsageCounter to reflect truth
-                                    // This is a bit hacky since GlobalUsageCounter is local-only logic usually.
-                                    // But we can force it or just use state for display.
-                                    // Ideally, GlobalUsageCounter should be refactored to support server sync.
-                                    // For now, let's update the UI state directly here or via a dedicated sync method if existed.
-                                    // Since we can't easily inject into the singleton logic without modifying it, 
-                                    // let's assume GlobalUsageCounter catches up or we rely on this state 
-                                    // for the badge? No, badge uses the singleton.
-                                    // Let's at least update remaining operations state in this component to be accurate
-                                    // even if the sidebar/others might be slightly off until they refresh.
+                                    // Sync Usage Stats from Server if available
+                                    if (typeof profile.usageCount === 'number') {
+                                        const limit = profile.usageLimit || 6
+                                        const remaining = Math.max(0, limit - profile.usageCount)
+                                        setRemainingOperations(remaining)
 
-                                    const limit = profile.usageLimit || 6
-                                    const remaining = Math.max(0, limit - profile.usageCount)
-                                    setRemainingOperations(remaining)
-
-                                    // Be explicit: Update the singleton if possible or just rely on this component's state
-                                    // The 'updateStatus' interval overrides this every 5s from GlobalUsageCounter.
-                                    // So we MUST update GlobalUsageCounter's internal state or it will overwrite us.
-                                    GlobalUsageCounter.syncFromServer(profile.usageCount, limit)
+                                        GlobalUsageCounter.syncFromServer(profile.usageCount, limit)
+                                    }
                                 }
                             }
+                        } catch (e) {
+                            console.error('Failed to fetch profile', e)
                         }
                     }
                 } catch (error) {
@@ -154,8 +147,8 @@ export function AppHeader() {
     }
 
     // Display session user name by default, but override with onboarding name if available
-    const displayUserName = userName || user?.fullName || "Guest"
-    const displayUserEmail = user?.primaryEmailAddress?.emailAddress || ""
+    const displayUserName = userName || user?.displayName || "Guest"
+    const displayUserEmail = user?.email || ""
 
     if (!isLoaded) {
         return (
@@ -180,7 +173,7 @@ export function AppHeader() {
                         <UsageCounterBadge />
                     </div>
                     <Button
-                        onClick={() => openSignIn()}
+                        onClick={() => signInWithGoogle()}
                         variant="outline"
                         className="gap-2"
                     >
@@ -255,7 +248,7 @@ export function AppHeader() {
                                     </p>
                                 </div>
                                 <Avatar className="w-10 h-10 border-2 border-border">
-                                    <AvatarImage src={user?.imageUrl || ""} alt={displayUserName} />
+                                    <AvatarImage src={user?.photoURL || ""} alt={displayUserName} />
                                     <AvatarFallback className="bg-accent text-accent-foreground font-semibold">
                                         {userInitials}
                                     </AvatarFallback>
@@ -325,7 +318,7 @@ export function AppHeader() {
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
-                                onClick={() => signOut({ redirectUrl: '/' })}
+                                onClick={() => signOut()}
                                 className="text-red-500 focus:text-red-500 focus:bg-red-50 dark:focus:bg-red-950/30 cursor-pointer"
                             >
                                 <LogOut className="w-4 h-4 mr-2" />

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
-import { useUser } from "@clerk/nextjs"
+import { useAuth } from "@/hooks/use-auth"
 import { createOrganization } from "@/lib/firestore-service"
 import { Building2, Loader2, Shield } from "lucide-react"
 
@@ -18,7 +18,7 @@ interface CreateOrganizationModalProps {
 }
 
 export function CreateOrganizationModal({ isOpen, onClose, onSuccess }: CreateOrganizationModalProps) {
-    const { user } = useUser()
+    const { user } = useAuth()
     const { toast } = useToast()
     const [name, setName] = useState("")
     const [domain, setDomain] = useState("")
@@ -32,8 +32,10 @@ export function CreateOrganizationModal({ isOpen, onClose, onSuccess }: CreateOr
         setCreating(true)
         try {
             const orgId = await createOrganization(
-                user.id,
+                user.uid,
                 name.trim(),
+                user.email || "",
+                user.displayName || "User",
                 domain.trim() || undefined,
                 {
                     allowSelfSignup,

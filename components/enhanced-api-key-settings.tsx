@@ -407,6 +407,38 @@ export function EnhancedApiKeySettings() {
               </Button>
             </div>
 
+            <div className="flex items-center justify-between p-3 border rounded-lg bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
+              <div>
+                <p className="font-medium text-sm text-blue-700 dark:text-blue-300">Migrate Legacy Data</p>
+                <p className="text-xs text-blue-600 dark:text-blue-400">Recover projects from previous system</p>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="bg-blue-200 dark:bg-blue-900 hover:bg-blue-300 dark:hover:bg-blue-800 text-blue-900 dark:text-blue-100"
+                onClick={async () => {
+                  if (confirm('This will attempt to find contracts/projects linked to your email from the old system. Continue?')) {
+                    try {
+                      const response = await fetch('/api/migrate-legacy');
+                      const result = await response.json();
+                      if (result.success) {
+                        alert(`✅ Migration Complete! ${result.count} projects recovered.`)
+                        window.location.reload()
+                      } else {
+                        alert('Migration completed but no new data found or partial success. Check console for details.')
+                      }
+                    } catch (e) {
+                      alert('Migration failed. Please try again later.')
+                      console.error(e)
+                    }
+                  }
+                }}
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Migrate
+              </Button>
+            </div>
+
             <div className="flex items-center justify-between p-3 border rounded-lg bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900">
               <div>
                 <p className="font-medium text-sm text-red-700 dark:text-red-300">Full Reset</p>

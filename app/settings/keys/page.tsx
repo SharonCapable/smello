@@ -7,7 +7,7 @@ import { ApiKeyManager } from '@/lib/api-key-manager'
 import { ApiKeySetup } from '@/components/api-key-setup'
 import { AITierStatus } from '@/components/ai-tier-status'
 import { useToast } from '@/hooks/use-toast'
-import { useUser } from '@clerk/nextjs'
+import { useAuth } from "@/hooks/use-auth"
 import { Key, Trash2, RefreshCw, CheckCircle2 } from 'lucide-react'
 
 function maskKey(k?: string) {
@@ -17,7 +17,7 @@ function maskKey(k?: string) {
 }
 
 export default function KeysSettingsPage() {
-  const { isLoaded, isSignedIn } = useUser()
+  const { user, isLoaded, isSignedIn } = useAuth()
   const [keys, setKeys] = useState<{ geminiKey?: string; claudeKey?: string } | null>(null)
   const [loading, setLoading] = useState(false)
   const [showSetup, setShowSetup] = useState(false)
@@ -27,19 +27,25 @@ export default function KeysSettingsPage() {
   async function load() {
     if (!isLoaded) return
     setLoading(true)
-    try {
-      // try server-side keys first
-      const res = await fetch('/api/keys')
-      if (res.ok) {
-        const data: { geminiKey?: string; claudeKey?: string } = await res.json()
-        setKeys(data)
-        // merge to local storage as well
-        try { await ApiKeyManager.loadServerKeys() } catch { }
-        setLoading(false)
-        return
+
+    // Try server-side keys if signed in
+    if (user) {
+      try {
+        const token = await user.getIdToken()
+        const res = await fetch('/api/keys', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+        if (res.ok) {
+          const data: { geminiKey?: string; claudeKey?: string } = await res.json()
+          setKeys(data)
+          // merge to local storage as well
+          try { await ApiKeyManager.loadServerKeys(token) } catch { }
+          setLoading(false)
+          return
+        }
+      } catch (e) {
+        // ignore
       }
-    } catch (e) {
-      // ignore
     }
 
     // fallback to local - map the ApiKeys format to our state format
@@ -51,21 +57,29 @@ export default function KeysSettingsPage() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [isLoaded, isSignedIn])
+  useEffect(() => { load() }, [isLoaded, isSignedIn, user])
 
   const handleRemove = async () => {
     if (!confirm('Remove stored API keys from your account?')) return
     setLoading(true)
     try {
-      const res = await fetch('/api/keys', { method: 'DELETE' })
-      if (res.ok) {
-        // clear local copies too
-        ApiKeyManager.removeApiKey('gemini')
-        ApiKeyManager.removeApiKey('anthropic')
-        setKeys(null)
-        toast({ title: 'Removed', description: 'Stored API keys removed from your account' })
+      if (user) {
+        const token = await user.getIdToken()
+        const res = await fetch('/api/keys', {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+        if (res.ok) {
+          // clear local copies too
+          ApiKeyManager.removeApiKey('gemini')
+          ApiKeyManager.removeApiKey('anthropic')
+          setKeys(null)
+          toast({ title: 'Removed', description: 'Stored API keys removed from your account' })
+        } else {
+          toast({ title: 'Remove failed', description: 'Failed to remove keys', variant: 'destructive' })
+        }
       } else {
-        toast({ title: 'Remove failed', description: 'Failed to remove keys', variant: 'destructive' })
+        toast({ title: 'Error', description: 'You must be signed in to remove server keys', variant: 'destructive' })
       }
     } catch (e) {
       alert('Failed to remove keys')

@@ -1,11 +1,21 @@
 import { NextResponse } from 'next/server'
-import admin, { initAdmin } from '@/lib/firebase-admin'
-import { auth } from '@clerk/nextjs/server'
+import admin, { initAdmin, adminAuth } from '@/lib/firebase-admin'
+import { headers } from 'next/headers'
 import { encryptText, decryptText } from '@/lib/crypto'
 
 async function getSessionUid() {
-  const { userId } = await auth()
-  return userId || null
+  const headersList = await headers()
+  const authHeader = headersList.get('Authorization')
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.split('Bearer ')[1]
+    try {
+      const decodedToken = await adminAuth().verifyIdToken(token)
+      return decodedToken.uid
+    } catch (e) {
+      console.warn('Firebase token verification failed', e)
+    }
+  }
+  return null
 }
 
 export async function GET() {

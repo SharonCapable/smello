@@ -1,16 +1,20 @@
 "use client"
 
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ArrowRight, Sparkles, Target, Layers, Zap, Users, Layout, Rocket } from "lucide-react"
-import { useClerk } from "@clerk/nextjs"
+import { ArrowRight, Sparkles, Target, Layers, Zap, Users, Layout, Rocket, Loader2 } from "lucide-react"
+import { useAuth } from "@/hooks/use-auth"
+import { useRouter } from "next/navigation"
 
 interface LandingPageProps {
     onGetStarted: () => void
 }
 
 export function LandingPage({ onGetStarted }: LandingPageProps) {
-    const { openSignIn } = useClerk()
+    const { isSignedIn, user } = useAuth()
+    const router = useRouter()
+
     return (
         <div className="min-h-screen bg-background grid-pattern flex flex-col">
             {/* Navigation Bar */}
@@ -34,8 +38,16 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
                             <a href="#teams" className="hover:text-foreground transition-colors">For Teams</a>
                             <a href="#pricing" className="hover:text-foreground transition-colors">Pricing</a>
                         </nav>
-                        <Button variant="ghost" className="font-medium" onClick={() => openSignIn()}>Sign In</Button>
-                        <Button onClick={onGetStarted} className="font-medium shadow-lg shadow-primary/20">Get Started</Button>
+                        {!isSignedIn ? (
+                            <Button variant="ghost" className="font-medium" onClick={() => router.push('/login')}>
+                                Sign In
+                            </Button>
+                        ) : (
+                            <div className="text-sm font-medium mr-2">Hi, {user?.displayName?.split(' ')[0]}</div>
+                        )}
+                        <Button onClick={onGetStarted} className="font-medium shadow-lg shadow-primary/20">
+                            {isSignedIn ? 'Dashboard' : 'Get Started'}
+                        </Button>
                     </div>
                 </div>
             </header>
@@ -63,7 +75,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
 
                         <div className="flex flex-col sm:flex-row gap-4 justify-center pt-8 animate-fade-in-up animation-delay-600">
                             <Button size="lg" className="h-14 px-8 text-lg gap-2 rounded-full shadow-xl shadow-primary/20 hover:scale-105 transition-transform" onClick={onGetStarted}>
-                                Start Building for Free
+                                {isSignedIn ? 'Go to Dashboard' : 'Start Building for Free'}
                                 <ArrowRight className="w-5 h-5" />
                             </Button>
                             <Button size="lg" variant="outline" className="h-14 px-8 text-lg rounded-full bg-background/50 backdrop-blur hover:bg-muted/50">

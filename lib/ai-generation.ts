@@ -10,10 +10,19 @@ export interface GenerationOptions {
   provider?: 'gemini' | 'anthropic'
 }
 
+import { auth } from "@/lib/firebase"
+
 async function generateTextWithGemini(prompt: string): Promise<string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+
+  if (auth && auth.currentUser) {
+    const token = await auth.currentUser.getIdToken()
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
   const response = await fetch('/api/generate', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ provider: 'gemini', prompt, model: 'gemini-2.0-flash-exp' }),
   })
 
@@ -33,11 +42,16 @@ async function generateTextWithGemini(prompt: string): Promise<string> {
 }
 
 async function generateTextWithClaude(prompt: string, apiKey: string | null): Promise<string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+
+  if (auth && auth.currentUser) {
+    const token = await auth.currentUser.getIdToken()
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
   const response = await fetch("/api/generate", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers,
     body: JSON.stringify({
       provider: "anthropic",
       apiKey,

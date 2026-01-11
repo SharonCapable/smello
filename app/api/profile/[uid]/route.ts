@@ -1,10 +1,20 @@
 import { NextResponse } from 'next/server'
-import admin, { initAdmin } from '@/lib/firebase-admin'
-import { auth } from '@clerk/nextjs/server'
+import admin, { initAdmin, adminAuth } from '@/lib/firebase-admin'
+import { headers } from 'next/headers'
 
 async function getSessionUid() {
-  const { userId } = await auth()
-  return userId || null
+  const headersList = await headers()
+  const authHeader = headersList.get('Authorization')
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.split('Bearer ')[1]
+    try {
+      const decodedToken = await adminAuth().verifyIdToken(token)
+      return decodedToken.uid
+    } catch (e) {
+      console.warn('Firebase token verification failed', e)
+    }
+  }
+  return null
 }
 
 export async function GET(_req: Request, { params }: { params: Promise<{ uid: string }> }) {
@@ -22,6 +32,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ uid: st
     }
 
     if (uid !== sessionUid) {
+      // Allow if admin? For now strict ownership.
       console.error(`Profile API error: Forbidden. Session UID: ${sessionUid}, Param UID: ${uid}`);
       return NextResponse.json({ error: 'forbidden' }, { status: 403 })
     }
@@ -35,9 +46,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ uid: st
     const usageLimit = Number(process.env.FREE_AI_OPERATIONS_LIMIT || 6)
 
     if (!doc.exists) {
-      // Even if user doc doesn't exist, might be useful to return partial info or null?
-      // Existing behavior returns null. Let's keep it null for now or return a basic structure if needed? 
-      // Returning null forces client to handle "no profile". 
       return NextResponse.json(null)
     }
 

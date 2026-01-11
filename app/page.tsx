@@ -27,22 +27,24 @@ import { WorkflowStepper, type WorkflowPhase, getPhaseTools, getNextPhase } from
 import { ProjectProgressManager } from "@/lib/project-progress"
 import { saveProject, setUserId, migrateToFirestore } from "@/lib/storage-hybrid"
 import type { StoredProject } from "@/lib/storage"
+import { UserStoryGenerator } from "@/components/user-story-generator"
 import FeaturePrioritization from "@/app/feature-prioritization"
 import ResearchAgent from "@/app/research-agent"
 import type { InputMode, ProjectData } from "@/types/user-story"
 import { useTheme } from "next-themes"
 import { SidebarNavigation } from "@/components/sidebar-navigation"
 // Import PDF utilities
-// Import PDF utilities
 import { validatePdfFile } from '@/lib/pdf-utils';
 import { parsePdf } from '@/app/actions/parse-pdf';
-import { useUser } from "@clerk/nextjs"
+import { useAuth } from "@/hooks/use-auth"
 import { LandingPage } from "@/components/landing-page"
 import { OnboardingFlow } from "@/components/onboarding-flow"
 import { TeamDashboard } from "@/components/team-dashboard"
 import { AppHeader } from "@/components/app-header"
 import { OnboardingPathSelector } from "@/components/onboarding-path-selector"
 import { useToast } from "@/hooks/use-toast"
+import { JoinOrganization } from "@/components/teams/join-organization"
+
 
 type AppState =
   | "landing"
@@ -71,6 +73,7 @@ type AppState =
   | "competitive-intelligence"
   | "roadmap-builder"
   | "risk-analysis"
+  | "user-story-generator"
 
 export default function HomePage() {
   const { toast } = useToast()
@@ -90,7 +93,7 @@ export default function HomePage() {
   const [extractedDescription, setExtractedDescription] = useState<string>("");
   const [showEditableExtract, setShowEditableExtract] = useState(false);
 
-  const { user, isLoaded, isSignedIn } = useUser()
+  const { user, isLoaded, isSignedIn } = useAuth()
 
   // Workflow state
   const [workflowPhase, setWorkflowPhase] = useState<WorkflowPhase>("ideation")
@@ -103,6 +106,49 @@ export default function HomePage() {
   useEffect(() => {
     setMounted(true)
 
+    // Check URL params for initial state (e.g. from login redirect)
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const initialState = params.get('intialState')
+      if (initialState === 'path-selection') {
+        setAppState('path-selection')
+        // Clean up URL
+        window.history.replaceState({}, '', '/')
+      }
+    }
+  }, [])
+
+  // Auto-redirect to dashboard/home if signed in and NOT in specific flow
+  useEffect(() => {
+    if (isLoaded && isSignedIn && appState === 'landing') {
+      // If we just landed and are signed in, go to home or path selection?
+      // User requested: "I dont think its necessary for the user to still click Dashboard... taken straight in"
+      // If they have onboarded (have prefs), go to workflow-home or team-dashboard.
+      // If not, maybe path-selection.
+
+      try {
+        const onboardingDataRaw = localStorage.getItem("smello-user-onboarding")
+        const onboardingData = onboardingDataRaw ? JSON.parse(onboardingDataRaw) : null
+
+        if (onboardingData) {
+          if (onboardingData.usageType === 'team' && onboardingData.organizationId) {
+            setAppState('team-dashboard')
+          } else {
+            setAppState('workflow-home')
+          }
+        } else {
+          // No onboarding data found, but signed in.
+          // It's safer to send them to 'path-selection' to choose/setup.
+          setAppState('path-selection')
+        }
+      } catch (e) {
+        console.error("Error reading onboarding for auto-redirect", e)
+        setAppState('workflow-home')
+      }
+    }
+  }, [isLoaded, isSignedIn, appState])
+
+  useEffect(() => {
     if (!isLoaded) return
 
     // Check for temporary onboarding data (from pre-auth flow)
@@ -118,19 +164,24 @@ export default function HomePage() {
       localStorage.removeItem("smello-onboarding-temp")
 
       // Save profile to Firestore to complete onboarding
-      fetch(`/api/profile/${user.id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: data.name || user.fullName || user.firstName || 'User',
-          role: data.role,
-          selectedPath: data.usageType === 'team' ? 'team' : 'pm',
-          onboardingCompleted: true
+      user.getIdToken().then(token => {
+        fetch(`/api/profile/${user.uid}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            name: data.name || user.displayName || 'User',
+            role: data.role,
+            selectedPath: data.usageType === 'team' ? 'team' : 'pm',
+            onboardingCompleted: true
+          })
+        }).then(() => {
+          console.log('Profile saved to Firestore after auth')
+        }).catch(err => {
+          console.error('Failed to save profile:', err)
         })
-      }).then(() => {
-        console.log('Profile saved to Firestore after auth')
-      }).catch(err => {
-        console.error('Failed to save profile:', err)
       })
 
       // Redirect to appropriate dashboard
@@ -179,36 +230,40 @@ export default function HomePage() {
       } else {
         // Session exists but no onboarding data in local storage.
         // Fetch from server to check if user has already onboarded.
-        const uid = user.id
+        const uid = user.uid
         if (uid) {
-          fetch(`/api/profile/${uid}`)
-            .then(res => res.json())
-            .then(data => {
-              if (data && data.onboardingCompleted) {
-                // Restore local storage
-                localStorage.setItem("smello-user-onboarding", JSON.stringify({
-                  name: data.name || user.fullName,
-                  role: data.role || "Product Manager",
-                  usageType: data.selectedPath === "team" ? "team" : "personal"
-                }))
-                // Redirect to dashboard
-                if (isTransitionState) {
-                  toast({
-                    title: "Welcome back!",
-                    description: `We found your existing account, ${data.name}. Redirecting you to your dashboard.`,
-                  })
-                  if (data.selectedPath === "team") {
-                    setAppState("team-dashboard")
-                  } else {
-                    setAppState("workflow-home")
-                  }
-                }
-              } else {
-                // Not onboarded on server either.
-              }
+          user.getIdToken().then(token => {
+            fetch(`/api/profile/${uid}`, {
+              headers: { 'Authorization': `Bearer ${token}` }
             })
-            .catch(e => console.error("Failed to sync profile on home load", e))
-            .finally(() => setIsCheckingProfile(false))
+              .then(res => res.json())
+              .then(data => {
+                if (data && data.onboardingCompleted) {
+                  // Restore local storage
+                  localStorage.setItem("smello-user-onboarding", JSON.stringify({
+                    name: data.name || user.displayName,
+                    role: data.role || "Product Manager",
+                    usageType: data.selectedPath === "team" ? "team" : "personal"
+                  }))
+                  // Redirect to dashboard
+                  if (isTransitionState) {
+                    toast({
+                      title: "Welcome back!",
+                      description: `We found your existing account, ${data.name}. Redirecting you to your dashboard.`,
+                    })
+                    if (data.selectedPath === "team") {
+                      setAppState("team-dashboard")
+                    } else {
+                      setAppState("workflow-home")
+                    }
+                  }
+                } else {
+                  // Not onboarded on server either.
+                }
+              })
+              .catch(e => console.error("Failed to sync profile on home load", e))
+              .finally(() => setIsCheckingProfile(false))
+          })
         } else {
           setIsCheckingProfile(false)
         }
@@ -226,9 +281,9 @@ export default function HomePage() {
   // Sync user ID with storage layer and migrate projects if needed
   useEffect(() => {
     if (isSignedIn && user) {
-      setUserId(user.id)
+      setUserId(user.uid)
       // Attempt migration of local projects to Firestore
-      migrateToFirestore(user.id).then((count) => {
+      migrateToFirestore(user.uid).then((count) => {
         if (count > 0) {
           console.log(`Migrated ${count} projects to Firestore`)
         }
@@ -301,24 +356,11 @@ export default function HomePage() {
   const handleNavigation = (state: AppState) => {
     // Onboarding Check for Team Dashboard
     if (state === "team-dashboard") {
-      try {
-        const onboardingDataRaw = localStorage.getItem("smello-user-onboarding")
-        const onboardingData = onboardingDataRaw ? JSON.parse(onboardingDataRaw) : {}
-
-        if (!onboardingData.organizationId || onboardingData.organizationId === "undefined") {
-          toast({
-            title: "Access Restricted",
-            description: "To access the Team Dashboard, you need to create an organization or accept an invite.",
-            variant: "destructive"
-          })
-          return
-        }
-      } catch (error) {
-        console.error("Error parsing onboarding data:", error)
-        // If data is corrupt, force onboarding or just block access
+      // Allow access to logged in users - TeamDashboard handles missing org state
+      if (!isSignedIn) {
         toast({
-          title: "Error",
-          description: "Your session data seems invalid. Please try logging in again.",
+          title: "Access Restricted",
+          description: "Please sign in to access the Team Dashboard.",
           variant: "destructive"
         })
         return
@@ -326,10 +368,9 @@ export default function HomePage() {
     }
 
     setAppState(state);
-    if (state === 'home') {
-      setEntryMode(null);
-      setCurrentProject(null);
-    }
+
+    // Smooth scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleBack = () => {
@@ -520,8 +561,35 @@ export default function HomePage() {
     />
   }
 
+
   if (appState === "team-dashboard") {
     const onboardingData = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("smello-user-onboarding") || "{}") : {}
+
+    // If no organization, show Join flow
+    if (!onboardingData.organizationId) {
+      return (
+        <JoinOrganization
+          onJoinSuccess={(orgId, teamId, orgName) => {
+            // Save to local storage
+            const newData = {
+              ...onboardingData,
+              organizationId: orgId,
+              teamId,
+              organizationName: orgName,
+              usageType: 'team'
+            }
+            if (typeof window !== 'undefined') {
+              localStorage.setItem("smello-user-onboarding", JSON.stringify(newData))
+              // Force a reload to pick up the new state effectively
+              // (In a real app, use a proper context/state manager)
+              window.location.reload()
+            }
+          }}
+          onBackToPM={() => setAppState("workflow-home")}
+        />
+      )
+    }
+
     return <TeamDashboard
       organizationId={onboardingData.organizationId}
       teamId={onboardingData.teamId}
@@ -774,6 +842,14 @@ export default function HomePage() {
             <RoadmapBuilder
               project={currentProject}
               onBack={() => setAppState("project-view")}
+            />
+          )}
+
+          {appState === "user-story-generator" && (
+            <UserStoryGenerator
+              project={currentProject}
+              onBack={() => setAppState(currentProject ? "project-view" : "workflow-home")}
+              onProjectUpdate={handleProjectUpdate}
             />
           )}
 

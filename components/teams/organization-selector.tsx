@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
-import { useUser } from "@clerk/nextjs"
+import { useAuth } from "@/hooks/use-auth"
 import { getUserOrganizations, OrganizationDoc, isSuperAdmin } from "@/lib/firestore-service"
 import { Building2, ChevronDown, Plus, Check, Loader2 } from "lucide-react"
 import { CreateOrganizationModal } from "./create-organization-modal"
@@ -23,7 +23,7 @@ interface OrganizationSelectorProps {
 }
 
 export function OrganizationSelector({ selectedOrgId, onSelectOrg }: OrganizationSelectorProps) {
-    const { user } = useUser()
+    const { user } = useAuth()
     const { toast } = useToast()
     const [organizations, setOrganizations] = useState<OrganizationDoc[]>([])
     const [loading, setLoading] = useState(true)
@@ -35,7 +35,7 @@ export function OrganizationSelector({ selectedOrgId, onSelectOrg }: Organizatio
 
         const fetchOrganizations = async () => {
             try {
-                const orgs = await getUserOrganizations(user.id)
+                const orgs = await getUserOrganizations(user.uid)
                 setOrganizations(orgs)
 
                 // Auto-select first org if none selected
@@ -44,7 +44,7 @@ export function OrganizationSelector({ selectedOrgId, onSelectOrg }: Organizatio
                 }
 
                 // Check if user is super admin
-                const isSuperAdminUser = await isSuperAdmin(user.id)
+                const isSuperAdminUser = await isSuperAdmin(user.uid)
                 setCanCreateOrg(isSuperAdminUser)
             } catch (error) {
                 console.error('Error fetching organizations:', error)
@@ -64,7 +64,7 @@ export function OrganizationSelector({ selectedOrgId, onSelectOrg }: Organizatio
     const handleCreateSuccess = async (orgId: string) => {
         // Refresh organizations
         if (!user) return
-        const orgs = await getUserOrganizations(user.id)
+        const orgs = await getUserOrganizations(user.uid)
         setOrganizations(orgs)
         onSelectOrg(orgId)
     }
@@ -144,7 +144,7 @@ export function OrganizationSelector({ selectedOrgId, onSelectOrg }: Organizatio
                                 <span className="truncate">{org.name}</span>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
-                                {org.superAdmins?.includes(user?.id || '') && (
+                                {org.superAdmins?.includes(user?.uid || '') && (
                                     <Badge variant="outline" className="text-xs">
                                         Admin
                                     </Badge>
@@ -182,7 +182,7 @@ export function OrganizationSelector({ selectedOrgId, onSelectOrg }: Organizatio
 
 // Compact version for use in headers/navbars
 export function OrganizationSelectorCompact({ selectedOrgId, onSelectOrg }: OrganizationSelectorProps) {
-    const { user } = useUser()
+    const { user } = useAuth()
     const [organizations, setOrganizations] = useState<OrganizationDoc[]>([])
     const [loading, setLoading] = useState(true)
 
@@ -191,7 +191,7 @@ export function OrganizationSelectorCompact({ selectedOrgId, onSelectOrg }: Orga
 
         const fetchOrganizations = async () => {
             try {
-                const orgs = await getUserOrganizations(user.id)
+                const orgs = await getUserOrganizations(user.uid)
                 setOrganizations(orgs)
 
                 if (!selectedOrgId && orgs.length > 0) {

@@ -10,13 +10,9 @@
 export function clearSmelloCache() {
     if (typeof window === 'undefined') return
 
-    // Keys to preserve (don't clear Clerk auth)
+    // Keys to preserve
     const keysToKeep = [
-        'clerk-db-jwt',
-        'clerk-db-client',
-        '__clerk_db_jwt',
-        '__clerk_client_uat',
-        '__clerk_db_jwt_exp',
+        'firebase:authUser',
     ]
 
     // Get all localStorage keys
@@ -24,8 +20,8 @@ export function clearSmelloCache() {
 
     // Remove Smello-specific keys
     allKeys.forEach(key => {
-        // Keep Clerk keys
-        if (keysToKeep.includes(key) || key.startsWith('clerk-') || key.startsWith('__clerk')) {
+        // Keep Firebase keys
+        if (keysToKeep.some(k => key.startsWith(k))) {
             return
         }
 

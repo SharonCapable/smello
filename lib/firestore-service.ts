@@ -594,6 +594,60 @@ export const isOrganizationMember = async (orgId: string, userId: string): Promi
   return memberSnap.exists();
 };
 
+// Check if user has a pending invite
+export const checkPendingInvite = async (orgId: string, email: string): Promise<InviteDoc | null> => {
+  if (!db) return null;
+  const invitesRef = collection(db, 'organizations', orgId, 'invites');
+  const q = query(
+    invitesRef,
+    where('email', '==', email),
+    where('status', '==', 'pending')
+  );
+
+  const querySnapshot = await getDocs(q);
+  if (!querySnapshot.empty) {
+    // Check if expired
+    const invite = querySnapshot.docs[0].data() as InviteDoc;
+    if (invite.expiresAt && invite.expiresAt.toMillis() < Date.now()) {
+      return null; // Expired
+    }
+    return invite;
+  }
+  return null;
+};
+
+// Create an invite (invitation-manager likely uses something similar, but ensuring we have a direct export)
+export const createOrganizationInvite = async (
+  orgId: string,
+  email: string,
+  role: 'super_admin' | 'org_admin' | 'team_admin' | 'member' | 'viewer',
+  invitedBy: string,
+  invitedByName: string
+): Promise<string> => {
+  if (!db) throw new Error('Firestore not initialized');
+
+  const inviteId = doc(collection(db, 'organizations', orgId, 'invites')).id;
+  const inviteRef = doc(db, 'organizations', orgId, 'invites', inviteId);
+
+  // Create 7 day expiry
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7);
+
+  await setDoc(inviteRef, {
+    id: inviteId,
+    orgId,
+    email,
+    role,
+    invitedBy,
+    invitedByName,
+    status: 'pending',
+    createdAt: serverTimestamp(),
+    expiresAt: Timestamp.fromDate(expiresAt)
+  });
+
+  return inviteId;
+};
+
 // Check if user is org admin
 export const isOrganizationAdmin = async (orgId: string, userId: string): Promise<boolean> => {
   if (!db) return false;
@@ -732,6 +786,49 @@ export const getPendingInvitesForUser = async (email: string): Promise<InviteDoc
   return snapshot.docs.map(doc => doc.data() as InviteDoc);
 };
 
+// Get all invites for an organization
+export const getOrganizationInvites = async (orgId: string): Promise<InviteDoc[]> => {
+  if (!db) return [];
+
+  const invitesRef = collection(db, 'invites');
+  const q = query(
+    invitesRef,
+    where('orgId', '==', orgId),
+    where('status', '==', 'pending'),
+    orderBy('createdAt', 'desc')
+  );
+
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => doc.data() as InviteDoc);
+};
+
+// Revoke organization invite
+export const revokeOrganizationInvite = async (inviteId: string): Promise<void> => {
+  if (!db) return;
+
+  const inviteRef = doc(db, 'invites', inviteId);
+  await deleteDoc(inviteRef);
+};
+
+// Get organization members
+export const getOrganizationMembers = async (orgId: string): Promise<OrganizationMemberDoc[]> => {
+  if (!db) return [];
+
+  const membersRef = collection(db, 'organizations', orgId, 'members');
+  const q = query(membersRef, orderBy('joinedAt', 'desc'));
+
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => doc.data() as OrganizationMemberDoc);
+};
+
+// Remove organization member
+export const removeOrganizationMember = async (orgId: string, userId: string): Promise<void> => {
+  if (!db) return;
+
+  const memberRef = doc(db, 'organizations', orgId, 'members', userId);
+  await deleteDoc(memberRef);
+};
+
 // Create Team (requires org admin permission)
 export const createTeam = async (
   orgId: string,
@@ -762,6 +859,8 @@ export const createTeam = async (
 
   return teamId;
 };
+
+
 
 // Add member to team
 export const addTeamMember = async (

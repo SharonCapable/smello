@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import admin, { initAdmin } from '@/lib/firebase-admin'
-import { auth, clerkClient } from '@clerk/nextjs/server'
+import admin, { initAdmin, adminAuth } from '@/lib/firebase-admin'
+import { headers } from 'next/headers'
 import { decryptText } from '@/lib/crypto'
 
 export interface TierStatus {
@@ -34,9 +34,24 @@ export interface TierStatus {
     recommendation: string
 }
 
+async function getSessionUid() {
+    const headersList = await headers()
+    const authHeader = headersList.get('Authorization')
+    if (authHeader?.startsWith('Bearer ')) {
+        const token = authHeader.split('Bearer ')[1]
+        try {
+            const decodedToken = await adminAuth().verifyIdToken(token)
+            return decodedToken.uid
+        } catch (e) {
+            console.warn('Firebase token verification failed', e)
+        }
+    }
+    return null
+}
+
 export async function GET() {
     try {
-        const { userId } = await auth()
+        const userId = await getSessionUid()
         if (!userId) {
             return NextResponse.json({ error: 'unauthenticated' }, { status: 401 })
         }
@@ -118,38 +133,10 @@ export async function GET() {
             }
         }
 
-        // Check OAuth status - if user signed in with Google via Clerk, they're connected
-        try {
-            const client = await clerkClient()
-            const user = await client.users.getUser(userId)
+        // OAuth status - Removed Clerk dependency
+        // In this implementation, we don't assume OAuth capabilities for Gemini directly
+        // tierStatus.oauth remains unavailable by default
 
-            // Check if user has a Google account connected
-            const googleAccount = user.externalAccounts?.find(
-                (acc: any) => acc.provider === 'google' || acc.provider === 'oauth_google'
-            )
-
-            if (googleAccount) {
-                tierStatus.oauth.available = true
-                tierStatus.oauth.provider = 'google'
-
-                // Try to get OAuth tokens to check for Gemini scope
-                try {
-                    const oauthTokens = await client.users.getUserOauthAccessToken(userId, 'google')
-                    if (oauthTokens && oauthTokens.data.length > 0) {
-                        const geminiScopes = ['https://www.googleapis.com/auth/generative-language']
-                        tierStatus.oauth.hasGeminiScope = geminiScopes.some(scope =>
-                            oauthTokens.data[0].scopes?.includes(scope)
-                        )
-                    }
-                } catch (e) {
-                    // No OAuth token with extra scopes, but user is still connected via Google
-                    console.log('Could not fetch OAuth tokens for scope check')
-                }
-            }
-        } catch (e) {
-            // User lookup failed
-            console.log('OAuth/user check failed:', e)
-        }
 
         // Check personal API keys
         try {

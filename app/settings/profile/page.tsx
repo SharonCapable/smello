@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { User, Mail, Briefcase, Save, Upload, CheckCircle2, Loader2, Pencil } from "lucide-react"
-import { useUser } from "@clerk/nextjs"
+import { useAuth } from "@/hooks/use-auth"
 import { useToast } from "@/hooks/use-toast"
 
 const PREDEFINED_ROLES = [
@@ -28,7 +28,7 @@ const PREDEFINED_ROLES = [
 ]
 
 export default function ProfilePage() {
-    const { user } = useUser()
+    const { user } = useAuth()
     const { toast } = useToast()
     const [isEditing, setIsEditing] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
@@ -52,9 +52,13 @@ export default function ProfilePage() {
 
             // Save to Firestore
             if (user) {
-                await fetch(`/api/profile/${user.id}`, {
+                const token = await user.getIdToken()
+                await fetch(`/api/profile/${user.uid}`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
                     body: JSON.stringify({
                         name: editedData.name,
                         role: editedData.role,
@@ -97,7 +101,7 @@ export default function ProfilePage() {
         )
     }
 
-    const userInitials = (profileData.name || user?.fullName || "U")
+    const userInitials = (profileData.name || user?.displayName || "U")
         .split(" ")
         .map((n: string) => n[0])
         .join("")
@@ -148,14 +152,14 @@ export default function ProfilePage() {
                     </CardHeader>
                     <CardContent className="flex items-center gap-6">
                         <Avatar className="w-20 h-20 border-2 border-muted">
-                            <AvatarImage src={user?.imageUrl || ""} alt={profileData.name || "User"} />
+                            <AvatarImage src={user?.photoURL || ""} alt={profileData.name || "User"} />
                             <AvatarFallback className="bg-primary/10 text-primary text-xl font-bold">
                                 {userInitials}
                             </AvatarFallback>
                         </Avatar>
                         <div className="space-y-1">
-                            <h3 className="font-medium text-lg">{profileData.name || user?.fullName || "User"}</h3>
-                            <p className="text-sm text-muted-foreground">{user?.primaryEmailAddress?.emailAddress}</p>
+                            <h3 className="font-medium text-lg">{profileData.name || user?.displayName || "User"}</h3>
+                            <p className="text-sm text-muted-foreground">{user?.email}</p>
                             <Button variant="outline" size="sm" disabled className="mt-2 h-8 text-xs gap-2">
                                 <Upload className="w-3 h-3" />
                                 Change Avatar
@@ -182,7 +186,7 @@ export default function ProfilePage() {
                                     />
                                 ) : (
                                     <div className="p-2.5 bg-muted/40 rounded-md text-sm border border-transparent">
-                                        {profileData.name || user?.fullName || "Not set"}
+                                        {profileData.name || user?.displayName || "Not set"}
                                     </div>
                                 )}
                             </div>

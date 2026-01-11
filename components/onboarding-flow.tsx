@@ -14,7 +14,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { User, Briefcase, ArrowRight, CheckCircle2, Lock, LogIn, Loader2, Building2, Users } from "lucide-react"
-import { useClerk, useUser } from "@clerk/nextjs"
+import { useAuth } from "@/hooks/use-auth"
 import { createOrganization, createTeam } from "@/lib/firestore-service"
 import { useToast } from "@/hooks/use-toast"
 
@@ -54,10 +54,10 @@ interface OnboardingFlowProps {
 
 export function OnboardingFlow({ onComplete, isAuthenticated, onBack, initialData, isEditMode = false, initialStep }: OnboardingFlowProps) {
     const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(initialStep || 1)
-    const { user } = useUser()
+    const { user, signInWithGoogle } = useAuth()
 
     // Auto-populate name from Clerk user
-    const userName = user?.fullName || user?.firstName || initialData?.name || ""
+    const userName = user?.displayName || initialData?.name || ""
 
     const [data, setData] = useState<OnboardingData>({
         name: userName, // Use Clerk's name
@@ -73,7 +73,6 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack, initialDat
     const [isSearchingOrg, setIsSearchingOrg] = useState(false)
     const [isSigningIn, setIsSigningIn] = useState(false)
     const [isCompleting, setIsCompleting] = useState(false)
-    const { openSignIn } = useClerk()
     const { toast } = useToast()
 
     // Check if user is super admin
@@ -81,7 +80,7 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack, initialDat
         const checkAdmin = async () => {
             if (user) {
                 const { isSuperAdmin } = await import("@/lib/firestore-service")
-                const result = await isSuperAdmin(user.id)
+                const result = await isSuperAdmin(user.uid)
                 setIsPrivileged(result)
             }
         }
@@ -136,7 +135,13 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack, initialDat
     const handleSignIn = async () => {
         setIsSigningIn(true)
         localStorage.setItem("smello-onboarding-temp", JSON.stringify(data))
-        openSignIn({ forceRedirectUrl: "/onboarding" })
+        try {
+            await signInWithGoogle()
+        } catch (e) {
+            console.error("Sign in failed", e)
+        } finally {
+            setIsSigningIn(false)
+        }
     }
 
     const handleFinishSetup = async () => {
@@ -151,15 +156,15 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack, initialDat
                     // Create real Org and Team in Firestore
                     console.log('Creating organization:', data.organizationName)
                     const orgId = await createOrganization(
-                        user.id,
+                        user.uid,
                         data.organizationName!,
-                        user.primaryEmailAddress?.emailAddress || "",
-                        user.fullName || user.firstName || "User"
+                        user.email || "",
+                        user.displayName || "User"
                     )
                     console.log('Organization created:', orgId)
 
                     console.log('Creating team:', data.teamName)
-                    const teamId = await createTeam(orgId, data.teamName!, "Initial team", user.id)
+                    const teamId = await createTeam(orgId, data.teamName!, "Initial team", user.uid)
                     console.log('Team created:', teamId)
 
                     resultData = {
@@ -173,9 +178,9 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack, initialDat
                     await joinOrganizationWithTeam(
                         foundOrg.id,
                         data.teamId,
-                        user.id,
-                        user.primaryEmailAddress?.emailAddress || "",
-                        user.fullName || user.firstName || "User"
+                        user.uid,
+                        user.email || "",
+                        user.displayName || "User"
                     )
 
                     resultData = {

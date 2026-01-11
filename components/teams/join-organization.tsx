@@ -13,7 +13,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { Building2, Users, Search, ArrowLeft, Loader2, CheckCircle2, AlertCircle, Briefcase } from "lucide-react"
-import { useUser } from "@clerk/nextjs"
+import { useAuth } from "@/hooks/use-auth"
 import { useToast } from "@/hooks/use-toast"
 
 interface JoinOrganizationProps {
@@ -22,7 +22,7 @@ interface JoinOrganizationProps {
 }
 
 export function JoinOrganization({ onJoinSuccess, onBackToPM }: JoinOrganizationProps) {
-    const { user } = useUser()
+    const { user } = useAuth()
     const { toast } = useToast()
     const [searchQuery, setSearchQuery] = useState("")
     const [isSearching, setIsSearching] = useState(false)
@@ -45,12 +45,25 @@ export function JoinOrganization({ onJoinSuccess, onBackToPM }: JoinOrganization
             setIsSearching(true)
             setHasSearched(true)
             try {
-                const { findOrganizationByName, getOrganizationTeams } = await import("@/lib/firestore-service")
-                const org = await findOrganizationByName(searchQuery)
-                setFoundOrg(org)
+                // Use API route to bypass Firestore rules for search
+                const response = await fetch(`/api/organizations/search?q=${encodeURIComponent(searchQuery)}`)
+                if (!response.ok) throw new Error("Search failed")
+                const data = await response.json()
+
+                // We pick the first match for now as the UI is designed for single result focus
+                // but the API returns a list.
+                const org = data.organizations?.[0]
+
+                setFoundOrg(org || null)
+
                 if (org) {
-                    const teams = await getOrganizationTeams(org.id)
-                    setOrgTeams(teams)
+                    // For teams, we still need to read them. 
+                    // If rules block this, we might need an API for teams too.
+                    // But usually, one can just join the org first? 
+                    // Let's assume we can fetch teams if we found the org (maybe unrelated)
+                    // ACTUALLY: The user is NOT a member, so they can't read teams either with current rules!
+                    // We need to fetch teams via API as well.
+                    fetchTeams(org.id)
                 } else {
                     setOrgTeams([])
                 }
@@ -60,6 +73,19 @@ export function JoinOrganization({ onJoinSuccess, onBackToPM }: JoinOrganization
                 setOrgTeams([])
             } finally {
                 setIsSearching(false)
+            }
+        }
+
+        const fetchTeams = async (orgId: string) => {
+            try {
+                // Use API route to bypass Firestore rules
+                const response = await fetch(`/api/organizations/get-teams?orgId=${orgId}`)
+                if (!response.ok) throw new Error("Failed to fetch teams")
+                const data = await response.json()
+                setOrgTeams(data.teams || [])
+            } catch (e) {
+                console.warn("Could not fetch teams", e)
+                setOrgTeams([])
             }
         }
 
@@ -74,12 +100,32 @@ export function JoinOrganization({ onJoinSuccess, onBackToPM }: JoinOrganization
         try {
             const { joinOrganizationWithTeam } = await import("@/lib/firestore-service")
 
+            // Check for pending invite via API to bypass Firestore rules
+            const inviteResponse = await fetch(`/api/organizations/check-invite?orgId=${foundOrg.id}&email=${encodeURIComponent(user.email || "")}`)
+
+            if (!inviteResponse.ok) {
+                throw new Error("Could not verify invitation status")
+            }
+
+            const inviteData = await inviteResponse.json()
+
+            if (!inviteData.invite) {
+                toast({
+                    title: "Access Denied",
+                    description: "You need an invitation to join this organization. Please contact the administrator.",
+                    variant: "destructive"
+                })
+                setIsJoining(false)
+                return
+            }
+
+            // Proceed with joining
             await joinOrganizationWithTeam(
                 foundOrg.id,
                 selectedTeamId,
-                user.id,
-                user.primaryEmailAddress?.emailAddress || "",
-                user.fullName || user.firstName || "User"
+                user.uid,
+                user.email || "",
+                user.displayName || "User"
             )
 
             const selectedTeam = orgTeams.find(t => t.id === selectedTeamId)

@@ -21,6 +21,7 @@ export interface UserStory {
 export interface Epic {
   id: string
   title: string
+  description: string
   user_stories: UserStory[]
 }
 

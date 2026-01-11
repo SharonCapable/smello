@@ -42,7 +42,7 @@ import {
     TeamProjectDoc,
     WorkflowDoc
 } from "@/lib/firestore-service"
-import { useUser } from "@clerk/nextjs"
+import { useAuth } from "@/hooks/use-auth"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { Timestamp } from "firebase/firestore"
@@ -60,7 +60,7 @@ const PROJECT_STATUS_CONFIG = {
 }
 
 export function ProjectsView({ organizationId, teamId }: ProjectsViewProps) {
-    const { user } = useUser()
+    const { user } = useAuth()
     const { toast } = useToast()
     const [projects, setProjects] = useState<TeamProjectDoc[]>([])
     const [workflows, setWorkflows] = useState<Map<string, WorkflowDoc>>(new Map())
@@ -133,7 +133,7 @@ export function ProjectsView({ organizationId, teamId }: ProjectsViewProps) {
                 orgId: organizationId,
                 teamId: teamId,
                 status: 'active',
-                createdBy: user.id,
+                createdBy: user.uid,
             })
 
             // Create workflow if template was selected
@@ -148,8 +148,11 @@ export function ProjectsView({ organizationId, teamId }: ProjectsViewProps) {
                 }))
 
                 const workflowId = await createWorkflow(organizationId, {
-                    ...workflowData,
-                    stages: stagesWithTimestamps as any,
+                    stages: stagesWithTimestamps as any[], // Explicit cast to any[] to bypass strict tyupe checks for now
+                    currentStageId: workflowData.currentStageId,
+                    templateId: projectData.workflowTemplate.id,
+                    templateName: projectData.workflowTemplate.name,
+                    projectId: projectId,
                 })
 
                 // Update project with workflow ID
@@ -182,8 +185,8 @@ export function ProjectsView({ organizationId, teamId }: ProjectsViewProps) {
                     stages: workflow.stages,
                     updatedAt: Timestamp.now() as any,
                 },
-                user.id,
-                user.fullName || user.firstName || 'User'
+                user.uid,
+                user.displayName || 'User'
             )
 
             toast({
@@ -217,8 +220,8 @@ export function ProjectsView({ organizationId, teamId }: ProjectsViewProps) {
                 workflow.id,
                 stageId,
                 timestampUpdates,
-                user.id,
-                user.fullName || user.firstName || 'User'
+                user.uid,
+                user.displayName || 'User'
             )
 
             toast({

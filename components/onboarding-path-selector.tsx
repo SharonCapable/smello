@@ -80,21 +80,15 @@ export function OnboardingPathSelector({ onSelectPath }: OnboardingPathSelectorP
                         </CardContent>
                     </Card>
 
-                    {/* Team Collaboration Card - DISABLED */}
+                    {/* Team Collaboration Card */}
                     <Card
-                        className="cursor-not-allowed opacity-60 relative overflow-hidden"
+                        className="cursor-pointer hover:border-accent hover:shadow-xl transition-all group relative overflow-hidden"
+                        onClick={() => onSelectPath('teams')}
                     >
-                        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-pink-500/5" />
-
-                        {/* Coming Soon Badge */}
-                        <div className="absolute top-4 right-4 z-10">
-                            <div className="bg-accent text-accent-foreground px-3 py-1 rounded-full text-xs font-semibold">
-                                Coming Soon
-                            </div>
-                        </div>
+                        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-pink-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
 
                         <CardHeader className="relative">
-                            <div className="w-16 h-16 rounded-2xl bg-purple-500/10 flex items-center justify-center mb-4">
+                            <div className="w-16 h-16 rounded-2xl bg-purple-500/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                                 <Users className="w-8 h-8 text-purple-600" />
                             </div>
                             <CardTitle className="text-2xl">Team Collaboration</CardTitle>
@@ -122,21 +116,21 @@ export function OnboardingPathSelector({ onSelectPath }: OnboardingPathSelectorP
                                 <div className="flex items-start gap-3">
                                     <Sparkles className="w-5 h-5 text-purple-600 mt-0.5 shrink-0" />
                                     <div>
-                                        <p className="font-semibold text-sm">Real-time Collaboration</p>
-                                        <p className="text-xs text-muted-foreground">Comments, mentions, notifications, and more</p>
+                                        <p className="font-semibold text-sm">Admin Dashboard</p>
+                                        <p className="text-xs text-muted-foreground">Manage organization users, teams, and invites</p>
                                     </div>
                                 </div>
                             </div>
 
                             <div className="pt-4 border-t">
-                                <Button className="w-full gap-2" variant="outline" disabled>
-                                    Coming Soon in Phase 2
+                                <Button className="w-full gap-2 group-hover:gap-3 transition-all" variant="outline">
+                                    Get Started with Teams
                                     <ArrowRight className="w-4 h-4" />
                                 </Button>
                             </div>
 
                             <p className="text-xs text-muted-foreground text-center">
-                                Team features launching soon with enhanced security
+                                Perfect for: Organizations, Development Teams, Admins
                             </p>
                         </CardContent>
                     </Card>
