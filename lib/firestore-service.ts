@@ -531,17 +531,52 @@ export const createOrganization = async (
   return orgId;
 };
 
-// Search for organization by name (case-insensitive)
+// Search for organization by name (partial/fuzzy match, case-insensitive)
 export const findOrganizationByName = async (name: string): Promise<OrganizationDoc | null> => {
   if (!db) return null;
   const orgsRef = collection(db, 'organizations');
-  const q = query(orgsRef, where('name', '==', name));
-  const querySnapshot = await getDocs(q);
 
-  if (!querySnapshot.empty) {
-    return querySnapshot.docs[0].data() as OrganizationDoc;
+  // First try exact match
+  const exactQuery = query(orgsRef, where('name', '==', name));
+  const exactSnapshot = await getDocs(exactQuery);
+
+  if (!exactSnapshot.empty) {
+    return exactSnapshot.docs[0].data() as OrganizationDoc;
   }
+
+  // If no exact match, fetch all orgs and do client-side partial match
+  // (Firestore doesn't support LIKE/CONTAINS queries)
+  const allOrgsSnapshot = await getDocs(orgsRef);
+  const searchLower = name.toLowerCase().trim();
+
+  for (const doc of allOrgsSnapshot.docs) {
+    const org = doc.data() as OrganizationDoc;
+    if (org.name.toLowerCase().includes(searchLower)) {
+      return org;
+    }
+  }
+
   return null;
+};
+
+// Search for multiple organizations matching a search term
+export const searchOrganizations = async (searchTerm: string, limit: number = 5): Promise<OrganizationDoc[]> => {
+  if (!db) return [];
+  const orgsRef = collection(db, 'organizations');
+  const allOrgsSnapshot = await getDocs(orgsRef);
+  const searchLower = searchTerm.toLowerCase().trim();
+
+  const matches: OrganizationDoc[] = [];
+
+  for (const doc of allOrgsSnapshot.docs) {
+    const org = doc.data() as OrganizationDoc;
+    if (org.name.toLowerCase().includes(searchLower)) {
+      matches.push(org);
+      if (matches.length >= limit) break;
+    }
+  }
+
+  return matches;
 };
 
 // Join an organization and a team within it

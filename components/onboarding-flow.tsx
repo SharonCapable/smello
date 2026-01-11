@@ -218,13 +218,13 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack, initialDat
                         {step === 1 ? (isEditMode ? "Update Your Profile" : "Welcome to SMELLO") :
                             step === 2 ? "What's the problem you're solving?" :
                                 step === 4 ? (isAuthenticated ? (isEditMode ? "Confirm Updates" : "Identity Verified") : "Create Your Account") :
-                                    "Setup Your Team"}
+                                    (isPrivileged ? "Create Your Organization" : "Join Your Team")}
                     </CardTitle>
                     <CardDescription className="text-lg">
                         {step === 1 ? (isEditMode ? "Update your personal details" : "Let's get to know you better") :
                             step === 2 ? "Tell us the problem or outcome you want to achieve (Optional)" :
                                 step === 4 ? (isAuthenticated ? (isEditMode ? "Ready to save your changes?" : "You're authenticated!") : "Secure your workspace to continue") :
-                                    "Define your organization and team workspace"}
+                                    (isPrivileged ? "Define your organization and create your first team" : "Search for your organization and select a team to join")}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-8">
@@ -523,8 +523,11 @@ export function OnboardingFlow({ onComplete, isAuthenticated, onBack, initialDat
                             disabled={step === 1}
                             onClick={() => {
                                 if (step === 5) {
-                                    // From team setup, go back to workflow selection
-                                    onBack()
+                                    // From team setup, go back to auth confirmation step
+                                    setStep(4)
+                                } else if (step === 4) {
+                                    // From auth step, go back to step 2
+                                    setStep(2)
                                 } else if (step > 1) {
                                     setStep((step - 1) as any)
                                 }

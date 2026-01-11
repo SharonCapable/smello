@@ -2,32 +2,32 @@ import { NextResponse } from "next/server"
 import { adminDb, adminAuth } from "@/lib/firebase-admin"
 import { headers } from "next/headers"
 
-// Helper to get logged-in user email from token or infer it
-// Since this is an admin route for self-migration, strict auth is tricky without passing token.
-// We'll rely on client passing a token or simpler: if we are in dev/demo mode, we assume checks are done.
-// Ideally, we get the 'Authorization' header.
-const getClientUser = async (request: Request) => {
-    // For this specific urgent task, we will try to get the user based on the session or request.
-    // NOTE: In a production app, verify the ID token.
-    // Here we'll implement a best-effort approach or just search for the specific emails mentioned by user if generic.
-    // However, the user said "searches for your old Clerk ID via your email".
-    // We'll assume the user is logged in on the client side. We can't easily get the user *here* without a token.
-    // So the client must pass the email or we rely on a fixed list for now? 
-    // No, better to try to extract from header if possible, or just accept email as query param for this tool (less secure but effective for "recover my data").
-    return null;
+// Verify Firebase ID token from Authorization header
+async function verifyAuthToken(request: Request): Promise<{ uid: string, email: string } | null> {
+    try {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) return null
+
+        const token = authHeader.split('Bearer ')[1]
+        const decodedToken = await adminAuth().verifyIdToken(token)
+        return { uid: decodedToken.uid, email: decodedToken.email || '' }
+    } catch (e) {
+        console.error('Token verification failed:', e)
+        return null
+    }
 }
 
+// GET: Admin migration for hardcoded emails (legacy support)
 export async function GET(request: Request) {
     try {
         const db = adminDb()
+        const { searchParams } = new URL(request.url)
+        const emailParam = searchParams.get('email')
 
-        // Hardcoded list of users to migrate for this request if auth is complex to setup in 1 step
-        // OR we can query ALL projects with 'user_' prefix (Clerk) and try to match them.
-        // User asked: "searches for your old Clerk ID via your email"
-        // Let's search projects that have an email field matching the known emails.
-
-        const targetEmails = ["sharon@ayadata.ai", "sharyere7@gmail.com"]
+        // Use query param email or fallback to hardcoded list
+        const targetEmails = emailParam ? [emailParam] : ["sharon@ayadata.ai", "sharyere7@gmail.com"]
         let migratedCount = 0
+        const results: { email: string, migrated: number, currentUid?: string, oldIds?: string[] }[] = []
 
         for (const email of targetEmails) {
             try {
@@ -35,19 +35,12 @@ export async function GET(request: Request) {
                 const userRecord = await adminAuth().getUserByEmail(email)
                 const currentUid = userRecord.uid
 
-                // FIND projects where creators email was stored (if any) OR where userId starts with 'user_' (Clerk)
-                // If we don't have email on project, we can't link easily.
-                // Let's assume we might have stored ownerEmail or similar.
-                // If not, we might need to assume orphans.
-
-                // Alternative: The user might have projects under an old ID.
-                // We will update ANY project that has this email in 'ownerEmail', 'email', 'creatorEmail' fields.
-
                 const projectsRef = db.collection("projects")
-                const snapshot = await projectsRef.get() // heavy read, but maybe necessary for one-off migration
+                const snapshot = await projectsRef.get()
 
                 const batch = db.batch()
                 let batchCount = 0
+                const oldIds: string[] = []
 
                 snapshot.docs.forEach(doc => {
                     const data = doc.data()
@@ -55,10 +48,11 @@ export async function GET(request: Request) {
                     const matchesEmail = data.email === email || data.ownerEmail === email || data.user === email
 
                     // Check if it's an old Clerk ID (usually starts with user_2...)
-                    const isOldId = data.userId && data.userId.startsWith('user_') && !data.userId.includes(currentUid)
+                    const isOldId = data.userId && data.userId.startsWith('user_') && data.userId !== currentUid
 
                     if (matchesEmail && isOldId) {
                         batch.update(doc.ref, { userId: currentUid, originalUserId: data.userId })
+                        oldIds.push(data.userId)
                         batchCount++
                         migratedCount++
                     }
@@ -68,12 +62,88 @@ export async function GET(request: Request) {
                     await batch.commit()
                 }
 
-            } catch (err) {
-                console.log(`Migration skip for ${email}:`, err)
+                results.push({ email, migrated: batchCount, currentUid, oldIds })
+
+            } catch (err: any) {
+                console.log(`Migration skip for ${email}:`, err?.message)
+                results.push({ email, migrated: 0 })
             }
         }
 
-        return NextResponse.json({ success: true, count: migratedCount })
+        return NextResponse.json({ success: true, totalMigrated: migratedCount, results })
+
+    } catch (error: any) {
+        console.error("Migration error:", error)
+        return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+}
+
+// POST: Authenticated user can migrate their own projects from old Clerk IDs
+export async function POST(request: Request) {
+    try {
+        const user = await verifyAuthToken(request)
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
+        const db = adminDb()
+        const { oldUserId } = await request.json().catch(() => ({}))
+
+        const projectsRef = db.collection("projects")
+
+        // If oldUserId provided, migrate from that specific ID
+        // Otherwise, search for any old Clerk IDs that could match
+        let snapshot
+        if (oldUserId) {
+            snapshot = await projectsRef.where('userId', '==', oldUserId).get()
+        } else {
+            // Search all projects looking for Clerk-style IDs starting with 'user_'
+            snapshot = await projectsRef.get()
+        }
+
+        const batch = db.batch()
+        let migratedCount = 0
+        const migratedProjects: string[] = []
+
+        snapshot.docs.forEach(doc => {
+            const data = doc.data()
+
+            // If specific oldUserId, migrate those
+            if (oldUserId && data.userId === oldUserId) {
+                batch.update(doc.ref, {
+                    userId: user.uid,
+                    originalUserId: data.userId,
+                    migratedAt: new Date()
+                })
+                migratedCount++
+                migratedProjects.push(data.name || doc.id)
+            }
+            // If searching all, migrate old Clerk IDs that match user's email
+            else if (!oldUserId && data.userId?.startsWith('user_') && data.userId !== user.uid) {
+                // Only migrate if we can verify ownership via email
+                const ownerEmail = data.email || data.ownerEmail || data.user
+                if (ownerEmail === user.email) {
+                    batch.update(doc.ref, {
+                        userId: user.uid,
+                        originalUserId: data.userId,
+                        migratedAt: new Date()
+                    })
+                    migratedCount++
+                    migratedProjects.push(data.name || doc.id)
+                }
+            }
+        })
+
+        if (migratedCount > 0) {
+            await batch.commit()
+        }
+
+        return NextResponse.json({
+            success: true,
+            migratedCount,
+            migratedProjects,
+            newUserId: user.uid
+        })
 
     } catch (error: any) {
         console.error("Migration error:", error)
